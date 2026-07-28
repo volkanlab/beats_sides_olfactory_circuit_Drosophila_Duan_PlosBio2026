@@ -1,0 +1,81 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+```
+
+
+```{r}
+counts <- as.data.frame(read_csv("OBiroi_bulk_antennal_RNAseq.csv"))
+
+rownames(counts) <- counts$GeneID
+
+counts <- counts[-1]
+
+counts
+```
+
+```{r}
+cpm <- counts / colSums(counts) * 1000000
+
+cpm
+```
+
+
+```{r}
+genelist <- c("LOC105277757", 
+              "LOC105281146", 
+              "LOC105278748", 
+              "LOC105278750", 
+              "LOC105284227", 
+              "LOC105285218", 
+              "LOC105275676", 
+              "LOC105279130", 
+              "LOC105282898", 
+              "LOC105278517", 
+              
+              "LOC105275893", 
+              "LOC105288222", 
+              "LOC105278806", 
+              "LOC105275896", 
+              "LOC105274945", 
+              #"LOC113561951", 
+              "LOC105274944", 
+              "LOC105286893", 
+              "LOC105280531", 
+              "LOC105287868")
+
+expression <- as.data.frame(t(cpm[genelist, ]))
+```
+
+
+```{r}
+colnames(expression) <- c("beat-I", "beat-II", "beat-IIIa", "beat-IIIb", "beat-IIIc", "beat-IV", "beat-V", "beat-VIa", "beat-VIb", "beat-VII", "side", "side-II", "side-III", "side-IVa", "side-IVb", "side-IVc", "side-VI", "side-VII", "side-VIII")
+
+expression$sample <- rownames(expression)
+
+expression %<>%
+  separate(sample, into = c("stage", "replicate"), sep = "-")
+
+expression$stage %<>% factor(levels = c("P0", "P2", "P3", "P4", "P8", "P14"))
+```
+
+
+```{r, fig.width=10}
+expression %>%
+  gather(gene, cpm, -stage, -replicate) %>%
+  ggplot(aes(x = stage, y = log2(cpm+1))) +
+  #ggplot(aes(x = stage, y = cpm)) +
+  geom_point(aes(color = stage, shape = replicate)) +
+  facet_wrap(~gene, ncol = 7) +
+  #ylim(0, 150) +
+  theme_linedraw() +
+  theme(aspect.ratio = 1) +
+  theme(strip.text = element_text(face = "italic", color = "black"),
+        strip.background = element_rect(fill = NA))
+```
+
