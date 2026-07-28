@@ -1,0 +1,85 @@
+---
+title: "Amos mutants antennal RNAseq"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggrepel)
+```
+
+
+```{r}
+amos_DEG_2019 <- read_csv("Menus2019_EdgeR.csv") %>% as.data.frame()
+genes <- read_tsv("genelist_beat-side.txt") %>% as.data.frame() %$% gene
+```
+
+
+```{r}
+amos_DEG_2019[amos_DEG_2019$Symbol %in% genes, ]
+```
+
+```{r}
+df <- amos_DEG_2019[amos_DEG_2019$Symbol %in% genes, ]
+```
+
+
+```{r}
+df[df$Symbol %in% c("CG12484", 
+                    "CG12950",
+                    "CG34371",
+                    "CG34113",
+                    "CG42313", 
+                    "CG34114", 
+                    "CG14372"), ]$Symbol <- c("side-VIII", 
+                                              "side-VII", 
+                                              "side-V", 
+                                              "side-III", 
+                                              "side-II", 
+                                              "side-VI",
+                                              "side-IV")
+```
+
+
+```{r}
+df
+```
+
+
+```{r}
+df$change <- "not significant"
+
+df[df$logFC > 0 & df$FDR <= 0.05, ]$change <- "up"
+df[df$logFC < 0 & df$FDR <= 0.05, ]$change <- "down"
+```
+
+
+
+```{r}
+ggplot() +
+  geom_point(data = amos_DEG_2019, mapping = aes(x = logFC, y = -log10(FDR)), color = "gray85", size = 1) +
+  geom_point(data = df, mapping = aes(x = logFC, y = -log10(FDR), color = change), size = 2) +
+  geom_vline(xintercept = c(-0.5, 0.5), col = "gray60", linetype = "dashed") +
+  geom_hline(yintercept = -log10(0.05), col = "gray60", linetype = "dashed") +
+  scale_color_manual(values = c(
+   "down" = "blue", 
+   "not significant" = "black", 
+   "up" = "red")) +
+  geom_text_repel(data = df, mapping = aes(x = logFC, y = -log10(FDR), label = Symbol), 
+                  fontface = "italic",
+                  #xlim = c(NA, Inf),
+                  #ylim = c(-Inf, Inf)
+                  ) +
+  ylim(0, 10) +
+  xlim(-4, 2) +
+  xlab(expression("log2FC(" ~italic("amos")~ "-/- vs WT )"))+
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(
+    axis.text=element_text(size = 12),
+    axis.title=element_text(size = 14),
+    legend.title=element_text(size = 14),
+    legend.text=element_text(size = 12)
+  )
+```
