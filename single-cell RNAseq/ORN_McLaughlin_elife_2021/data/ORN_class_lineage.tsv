@@ -1,0 +1,36 @@
+all_types	sensillar_type	sensillum	sensillum_neuron
+D	TSB	Ab9	Ab9A
+DA1	AT	At1	At1A
+DA4l	AT	At3	At3C
+DC1	AT	At3	At3A
+DC2	TSB	Ab6	Ab6A
+DC3	AT	At2	At2A
+DL2d/v_DP1l_VC3l	AC	Ac3_Ac2	Ac3A_Ac2_Ac3B
+DL3	AT	At4	At4B
+DL4	TSB	Ab10	Ab10B
+DL5	TSB	Ab4	Ab4A
+DM1	LB	Ab1	Ab1A
+DM2	LB	Ab3	Ab3A
+DM3	TSB	Ab5	Ab5B
+DM4	LB	Ab2	Ab2A
+DM6	TSB	Ab10	Ab10A
+DP1l	AC	Ac2	Ac2
+DP1m_DC4	SAC	"Sacculus, chamber III"	"Sacculus, chamber III"
+NaN	NaN	NaN	NaN
+V	LB	Ab1	Ab1C
+VA1d	AT	At4	At4C
+VA1v	AT	At4	At4A
+VA2	LB	Ab1	Ab1B
+VA6_DC3_DM3	TSB	Ab5_At2	Ab5A_At2A_Ab5B
+VC3	AC	Ac3	Ac3B
+VL1	AC	Ac1_Ac2_Ac4	Ac1_Ac2_Ac4
+VL1_VM1	AC	Ac1_Ac2_Ac4	Ac1_Ac2_Ac4
+VL2a	AC	Ac4	Ac4
+VM3	TSB	Ab8	Ab8B
+VM3_VA5	TSB	Ab8_Ab6	Ab8B_Ab6B
+VM4	AC	Ac4	Ac4
+VM5d	LB	Ab3	Ab3B
+VM5d/v	LB_TSB	Ab3_Ab7	Ab3B_Ab7A
+VM5v	TSB	Ab7	Ab7A
+VP1l_VP3	SAC	"Sacculus, chamber I_Arista"	"Sacculus, chamber I_Arista"
+VP4_VP1d_VP2	SAC_AST	"Sacculus, chambers I + II_Arista"	"Sacculus, chambers I + II_Arista"
