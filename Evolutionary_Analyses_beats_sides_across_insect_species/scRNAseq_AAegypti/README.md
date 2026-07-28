@@ -3,3 +3,5 @@ The results presented in Figs 5E, S12B were reanalyzed from the previously publi
 Herre, et al, 2022, Non-canonical odor coding in the mosquito. Cell. 185:3104-3123 e3128.
 
 The datasets could be found in https://zenodo.org/records/6981677 and https://zenodo.org/records/5818952, respectively. 
+
+*** Alternatively, the large .rds files can be accessed at https://zenodo.org/records/21652764. 
