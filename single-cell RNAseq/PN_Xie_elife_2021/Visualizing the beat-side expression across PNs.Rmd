@@ -1,0 +1,185 @@
+---
+title: "Visualizing the beat-side expression across PNs"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(RColorBrewer)
+
+library(ggridges) #for geom_density_ridges function
+```
+
+
+```{r}
+counts <- read_tsv("./data/counts.tsv") %>% as.data.frame()
+PNs <- read_tsv("./data/PNs.tsv") %>% as.data.frame()
+```
+
+
+```{r}
+genes <- read_tsv("./resources/genelist_beat-side.txt", show_col_types = FALSE) %>% 
+      as.data.frame() %$% 
+      gene
+```
+
+
+```{r}
+bs_cell <- counts[counts$genename %in% genes, ]
+```
+
+```{r}
+bs_cell$genename
+```
+
+```{r}
+rownames(bs_cell) <- c("beat-Ia", 
+                       "side", 
+                       "beat-Ic", 
+                       "beat-Ib", 
+                       "beat-IIIc", 
+                       "side-VII", 
+                       "beat-Vc", 
+                       "beat-Va", 
+                       "beat-Vb", 
+                       "side-IV", 
+                       "beat-IIb", 
+                       "beat-IIa", 
+                       "beat-IV", 
+                       "beat-VI", 
+                       "beat-IIIb", 
+                       "side-III", 
+                       "side-VI", 
+                       "side-V", 
+                       "side-VIII", 
+                       "beat-VII", 
+                       "side-II")
+```
+
+
+```{r}
+cell_bs <- bs_cell %>%
+  dplyr::select(-genename) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame()
+
+cell_bs$cell <- rownames(cell_bs)
+
+cell_bs <- cell_bs %>%
+  dplyr::left_join(PNs[c("cell", "PN_type", "stage")], by = c("cell" = "cell"))
+```
+
+
+
+
+```{r, fig.width = 32, fig.height = 64}
+cell_bs %>% 
+  gather(gene, expression, -cell, -PN_type, -stage) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_density_ridges(jittered_points = TRUE) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    #strip.text = element_text(size = 20)
+    )
+
+cell_bs %>% 
+  gather(gene, expression, -cell, -PN_type, -stage) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_jitter(height = 0.2, width = 0.1, alpha = 0.5) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    #strip.text = element_text(size = 20)
+    )
+```
+
+
+
+
+```{r}
+fraction <- function(x) {
+  return(length(x[x >= 0.5]) / length(x))
+}
+
+mean_cutoff <- function(x) {
+  if (length(x[x >= 0.5]) == 0) {
+    return(0)
+    } else {
+      return(mean(x[x >= 0.5])) 
+      }
+}
+```
+
+
+```{r}
+cell_bs_fraction <- cell_bs %>%
+  dplyr::filter(PN_type != "nan") %>%
+  dplyr::select(-cell) %>%
+  dplyr::group_by(PN_type, stage) %>%
+  dplyr::summarize_all(fraction) %>%
+  gather(gene, fraction, -PN_type, -stage) 
+
+cell_bs_mean <- cell_bs %>%
+  dplyr::filter(PN_type != "nan") %>%
+  dplyr::select(-cell) %>%
+  dplyr::group_by(PN_type, stage) %>%
+  dplyr::summarize_all(mean_cutoff) %>%
+  gather(gene, mean, -PN_type, -stage) 
+
+cell_bs_sum <- 
+  dplyr::left_join(cell_bs_fraction, cell_bs_mean) 
+
+cell_bs_sum$gene %<>% factor(levels = sort(rownames(bs_cell)))
+
+cell_bs_sum[cell_bs_sum$stage == "48h", ]$stage <- "mid-pupal"
+cell_bs_sum$stage %<>% factor(levels = c("0h", "24h", "mid-pupal", "adult"))
+
+type_order <- cell_bs %>%
+  dplyr::filter(PN_type != "nan") %$%
+  PN_type %>%
+  unique() %>%
+  sort() %>%
+  rev()
+cell_bs_sum$PN_type %<>% factor(levels = type_order)
+```
+
+
+```{r, fig.width = 64, fig.height = 64}
+cell_bs_sum %>%
+  ggplot(aes(x = PN_type, y = gene, color = mean, size = fraction)) +
+  geom_point() +
+  #scale_size_area(max_size = 10) +
+  scale_radius(range = c(0, 30)) +
+  scale_color_gradientn(colors = brewer.pal(9, "YlOrRd")) +
+  #scale_color_gradient(low="yellow", high="red") +
+  xlab("ORN type/glomerulus") +
+  ylab("gene") +
+  #labs(title = "ORN over development") +
+  facet_wrap(~stage, strip.position = "top", scales = "free", ncol = 2) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 50, angle = 90, vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size = 40, face = "italic"),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 80),
+    axis.title = element_blank(),
+    legend.title = element_text(size = 70),
+    legend.text = element_text(size = 60),
+    legend.key.size = unit(4, "cm"),
+    strip.text = element_text(size = 80)
+    )
+```
+
+

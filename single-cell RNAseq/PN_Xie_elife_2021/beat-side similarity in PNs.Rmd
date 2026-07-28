@@ -1,0 +1,393 @@
+---
+title: "Analysing beat-side combinatorial code similarity across PNs based on the single-cell/nucleus RNAseq data"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+library(ggridges)
+library(ggrepel)
+library(ggpubr)
+library(RColorBrewer)
+library(gplots)
+library(ggtext)
+library(ggbeeswarm)
+library(showtext)
+```
+
+
+```{r}
+# Load the count matrix (gene x cell) and the column metadata for cell-type annotation. 
+counts <- read_tsv("./data/counts.tsv") %>% as.data.frame()
+PNs <- read_tsv("./data/PNs.tsv") %>% as.data.frame()
+```
+
+```{r}
+PNs$PN_type %>% 
+  unique() %>% 
+  sort() 
+
+PNs$stage %>% 
+  unique() %>% 
+  sort()
+```
+
+```{r}
+PNs[PNs$PN_type == "DA1_fru+" | PNs$PN_type == "DA1_fru-", ]$PN_type <- "DA1"
+```
+
+
+```{r}
+PNs_ORN <- dplyr::left_join(PNs, as.data.frame(read_tsv("./data/PN_class_ORN.tsv")), by = "PN_type")
+```
+
+
+```{r}
+#cell_info <- PNs_ORN[PNs_ORN$stage == "0h" & PNs_ORN$PN_type != "nan" & PNs_ORN$PN_type != "APL" & !is.na(PNs_ORN$lineage) & PNs_ORN$lineage != "APL" & PNs_ORN$lineage != "vPN", ]
+#cell_info <- PNs_ORN[PNs_ORN$stage == "24h" & PNs_ORN$PN_type != "nan" & PNs_ORN$PN_type != "APL" & !is.na(PNs_ORN$lineage) & PNs_ORN$lineage != "APL" & PNs_ORN$lineage != "vPN", ]
+cell_info <- PNs_ORN[PNs_ORN$stage == "48h" & PNs_ORN$PN_type != "nan" & PNs_ORN$PN_type != "APL" & !is.na(PNs_ORN$lineage) & PNs_ORN$lineage != "APL" & PNs_ORN$lineage != "vPN", ]
+#cell_info <- PNs_ORN[PNs_ORN$stage == "adult" & PNs_ORN$PN_type != "nan" & PNs_ORN$PN_type != "APL" & !is.na(PNs_ORN$lineage) & PNs_ORN$lineage != "APL" & PNs_ORN$lineage != "vPN", ]
+```
+
+```{r}
+cell_info %>% 
+  group_by(PN_type, lineage) %>% 
+  count()
+```
+
+
+```{r}
+cells <- cell_info$cell
+PN_types <- cell_info$PN_type
+lineages <- cell_info$lineage
+```
+
+
+```{r}
+genelistfile <- "./resources/genelist_beat-side.txt"
+#genelistfile <- "./resources/genelist_IgSF.txt"
+#genelistfile <- "./resources/genelist_CSMs.txt"
+
+genes <- read_tsv(genelistfile) %>% 
+  as.data.frame() %$% 
+  gene
+```
+
+
+```{r}
+# Comparison based on the whole transcriptome.
+#gene_cell <- counts[, cells]
+
+# Comparison based on the select genes.
+gene_cell <- counts[counts$genename %in% genes, c(cells)]
+```
+
+
+```{r}
+# These two helper functions find the cells with zero values for all the genes of interest (rows). 
+
+allzero <- function (x) {
+  result = TRUE
+  
+  for (i in 1:length(x)) {
+    if (x[i] != 0) {result = FALSE}
+  }
+  
+  return(result)
+}
+
+get_zero_cells <- function (matrix) {
+  zero_cells <- numeric()
+  
+  for (i in 1:ncol(matrix)) {
+    if (allzero(matrix[[i]])) {
+      zero_cells <- append(zero_cells, i)
+      }
+  }
+  
+  return(zero_cells)
+}
+```
+
+```{r}
+zero_cells <- get_zero_cells(gene_cell)
+
+print(length(zero_cells))
+```
+
+```{r}
+# Remove the cells with zero values for all the genes of interest (rows). 
+
+if (length(zero_cells) != 0) {
+  gene_cell <- subset(gene_cell, select = -zero_cells)
+  cell_info <- cell_info[-zero_cells, ]
+  cells <- cell_info$cell
+  PN_types <- cell_info$PN_type
+  lineages <- cell_info$lineage
+}
+```
+
+
+
+
+```{r}
+gene_cell_cor <- gene_cell %>%
+  as.matrix() %>%
+  cor(method = "spearman")
+```
+
+
+```{r, fig.asp=1}
+heatmap.2(gene_cell_cor, 
+          trace = "none", 
+          density.info = "none",
+          col = "bluered",
+          breaks = seq(-1, 1, length.out=17),
+          labRow = FALSE,
+          labCol = FALSE)
+```
+
+
+```{r}
+# Data, not shuffled. 
+
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(gene_cell_cor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, gene_cell_cor[i, j])
+    
+    if (PN_types[i] == PN_types[j] & lineages[i] == lineages[j]) {
+      relation = append(relation, "same glomerulus, same lineage")
+    } else if (PN_types[i] == PN_types[j] & lineages[i] != lineages[j]) {
+        relation = append(relation, "same glomerulus, different lineages")
+    } else if (PN_types[i] != PN_types[j] & lineages[i] == lineages[j]) {
+      relation = append(relation, "different glomeruli, same lineage")
+    } else if (PN_types[i] != PN_types[j] & lineages[i] != lineages[j]) {
+      relation = append(relation, "different glomeruli, different lineages")
+    #} else {relation = append(relation, "NaN")
+    }
+    
+    if(j==ndim & i%%10==0) {print(i/ndim*100)}
+  }
+}
+```
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("different glomeruli, different lineages", "same glomerulus, different lineages", "different glomeruli, same lineage", "same glomerulus, same lineage"))
+```
+
+```{r}
+#similarity_summary %>% write.table (file = "./analysis/new_noAPL_novPN/similarity_beatside_48hPN.tsv", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+
+```{r}
+relation_count <- similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+relation_count
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+# Resample the same number of entries in each relation category and perform the statistics for comparison.
+
+set.seed(2024)
+
+size = 4000
+
+similarity_summary_resample <- similarity_summary[similarity_summary$relation == relation_count$relation[1], ][sample(1:relation_count$n[1], size, replace=FALSE),] %>% 
+  rbind(similarity_summary[similarity_summary$relation == relation_count$relation[2], ][sample(1:relation_count$n[2], size, replace=FALSE),]) %>%
+  rbind(similarity_summary[similarity_summary$relation == relation_count$relation[3], ][sample(1:relation_count$n[3], size, replace=FALSE),]) #%>% 
+  #rbind(similarity_summary[similarity_summary$relation == relation_count$relation[4], ][sample(1:relation_count$n[4], size, replace=FALSE),])
+```
+
+```{r}
+similarity_summary_resample %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_resample %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary_resample)
+```
+
+
+```{r}
+my_comparison <- list(c("different glomeruli, same lineage", "different glomeruli, different lineages"),
+                      c("same glomerulus, same lineage", "different glomeruli, different lineages"), 
+                      c("same glomerulus, same lineage", "different glomeruli, same lineage")
+                      )
+
+showtext_auto()
+
+#data = similarity_summary_resample
+data = similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.6
+    ) +
+  scale_fill_manual(values = c(
+    "different glomeruli, different lineages" = "#9BC985",
+    "same glomerulus, different lineages" = "#F7D58B",
+    "different glomeruli, same lineage" = "#B595BF",
+    "same glomerulus, same lineage" = "#797BB7"
+  )) + 
+  #ylim(NA, 1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 12)
+        ) 
+
+#ggsave("similarity_comparison_PN.pdf")
+```
+
+```{r}
+data %>%
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean = mean(similarity, na.rm=TRUE)) %>% 
+  ggplot() +
+    geom_line(aes(relation, mean, group=1), color="gray") +
+    geom_point(aes(relation, mean, color=relation), size=4) + 
+    scale_color_manual(values = c(
+    "different glomeruli, different lineages" = "#9BC985",
+    "same glomerulus, different lineages" = "#F7D58B",
+    "different glomeruli, same lineage" = "#B595BF",
+    "same glomerulus, same lineage" = "#797BB7"
+  )) + 
+    #ylim(0.2,1) +
+    theme_classic() +
+    theme(axis.text.x=element_blank(), 
+        axis.text.y=element_blank()
+        ) 
+```
+
+
+```{r}
+#shuffle cell identities
+
+set.seed(1973)
+row_order <- sample(1:nrow(gene_cell_cor))
+
+gene_cell_cor_shuffled <- gene_cell_cor[row_order, row_order]
+
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(gene_cell_cor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, gene_cell_cor_shuffled[i, j])
+    
+    if (PN_types[i] == PN_types[j] & lineages[i] == lineages[j]) {
+      relation = append(relation, "same glomerulus, same lineage")
+    } else if (PN_types[i] == PN_types[j] & lineages[i] != lineages[j]) {
+        relation = append(relation, "same glomerulus, different lineages")
+    } else if (PN_types[i] != PN_types[j] & lineages[i] == lineages[j]) {
+      relation = append(relation, "different glomeruli, same lineage")
+    } else if (PN_types[i] != PN_types[j] & lineages[i] != lineages[j]) {
+      relation = append(relation, "different glomeruli, different lineages")
+    #} else {relation = append(relation, "NaN")
+    }
+    
+    if(j==ndim & i%%10==0) {print(i/ndim*100)}
+  }
+}
+```
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("different glomeruli, different lineages", "same glomerulus, different lineages", "different glomeruli, same lineage", "same glomerulus, same lineage"))
+
+#similarity_summary %>% write.table (file = "./analysis/new_noAPL_novPN/similarity_beatside_48hPN_shuffled.tsv", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+
+```{r}
+relation_count <- similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+relation_count
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("different glomeruli, same lineage", "different glomeruli, different lineages"),
+                      c("same glomerulus, same lineage", "different glomeruli, different lineages"), 
+                      c("same glomerulus, same lineage", "different glomeruli, same lineage")
+                      )
+
+showtext_auto()
+
+data = similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.6
+    ) +
+  scale_fill_manual(values = c(
+    "different glomeruli, different lineages" = "#9BC985",
+    "same glomerulus, different lineages" = "#F7D58B",
+    "different glomeruli, same lineage" = "#B595BF",
+    "same glomerulus, same lineage" = "#797BB7"
+  )) + 
+  #ylim(NA, 1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 12)
+        ) 
+
+#ggsave("similarity_comparison_PN_shuffled.pdf")
+```
+
