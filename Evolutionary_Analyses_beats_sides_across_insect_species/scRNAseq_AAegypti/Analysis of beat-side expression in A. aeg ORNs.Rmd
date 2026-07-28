@@ -1,0 +1,270 @@
+---
+title: "Survey the expression of beat/side othorlogs in mosquitos Aedes aegypti"
+output: html_notebook
+---
+
+# Load the packages. 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggridges)
+library(RColorBrewer)
+
+library(Seurat)
+```
+
+
+# Prepare the dataset. 
+```{r}
+# The following datasets could be found in https://zenodo.org/records/6981677 and https://zenodo.org/records/5818952, respectively. Associated to the reference: Herre, et al, 2022, Non-canonical odor coding in the mosquito. Cell. 185:3104-3123 e3128.
+mydata <- readRDS("SeuratObject2_Antenna_mergedBatches_Neurons.rds")
+mydata2 <- readRDS("SeuratObject_MaxPalpNeurons.rds")
+```
+
+
+```{r}
+expression <- as.data.frame(mydata@assays$SCT@data)
+expression2 <- as.data.frame(mydata2@assays$RNA@data)
+```
+
+
+```{r}
+umap_clusters <- mydata$seurat_clusters
+cell_info <- data.frame(cells = names(umap_clusters), clusters = umap_clusters)
+
+umap_clusters2 <- mydata2$seurat_clusters
+cell_info2 <- data.frame(cells = names(umap_clusters2), clusters = umap_clusters2)
+```
+
+
+
+
+```{r}
+genelist <- c("LOC5566816", 
+              "LOC5572937", 
+              "LOC110676758", 
+              "LOC5566409", 
+              "LOC5564746", 
+              "LOC5575664", 
+              "LOC5575663", 
+              "LOC5573307", 
+              "LOC5564316", 
+              "LOC5571213", 
+              "LOC5579262", 
+              "LOC5578571", 
+              "LOC5572379",
+              
+              "LOC5565349", 
+              "LOC5571423", 
+              "LOC5573643", 
+              "LOC5572620", 
+              "LOC5569913", 
+              "LOC5570293", 
+              "LOC5566683", 
+              "LOC5569257", 
+              "LOC5574581", 
+              "LOC5576331")
+```
+
+
+```{r}
+genelist2 <- c(c("Gr1", "Gr2", "Gr3"), 
+              "LOC5566816", 
+              "LOC5572937", 
+              "LOC110676758", 
+              "LOC5566409", 
+              "LOC5564746", 
+              "LOC5575664", 
+              "LOC5575663", 
+              "LOC5573307", 
+              "LOC5564316", 
+              "LOC5571213", 
+              "LOC5579262", 
+              "LOC5578571", 
+              "LOC5572379",
+              
+              "LOC5565349", 
+              "LOC5571423", 
+              "LOC5573643", 
+              "LOC5572620", 
+              "LOC5569913", 
+              "LOC5570293", 
+              "LOC5566683", 
+              "LOC5569257", 
+              "LOC5574581", 
+              "LOC5576331")
+```
+
+
+```{r}
+cell_gene <- as.data.frame(t(expression[genelist, ]))
+
+colnames(cell_gene) <- c("beat-Ia1", "beat-Ia2", "beat-Ib", "beat-IIa", "beat-IIb", "beat-IIIc1", "beat-IIIc2", "beat-IVa", "beat-IVb", "beat-Va", "beat-Vb", "beat-VI", "beat-VII", "side", "side-IIa", "side-IIb", "side-IIc", "side-III", "side-IV", "side-V", "side-VI", "side-VII", "side-VIII")
+
+cell_gene$cells <- cell_info$cells
+cell_gene$clusters <- cell_info$clusters
+```
+
+
+```{r}
+#cell_gene2 <- as.data.frame(t(expression2[genelist2, ]))
+cell_gene2 <- as.data.frame(t(expression2[genelist, ]))
+
+#colnames(cell_gene2) <- c(c("Gr1", "Gr2", "Gr3"), "beat-Ia1", "beat-Ia2", "beat-Ib", "beat-IIa", "beat-IIb", "beat-IIIc1", "beat-IIIc2", "beat-IVa", "beat-IVb", "beat-Va", "beat-Vb", "beat-VI", "beat-VII", "side", "side-IIa", "side-IIb", "side-IIc", "side-III", "side-IV", "side-V", "side-VI", "side-VII", "side-VIII")
+colnames(cell_gene2) <- c("beat-Ia1", "beat-Ia2", "beat-Ib", "beat-IIa", "beat-IIb", "beat-IIIc1", "beat-IIIc2", "beat-IVa", "beat-IVb", "beat-Va", "beat-Vb", "beat-VI", "beat-VII", "side", "side-IIa", "side-IIb", "side-IIc", "side-III", "side-IV", "side-V", "side-VI", "side-VII", "side-VIII")
+
+cell_gene2$cells <- cell_info2$cells
+cell_gene2$clusters <- cell_info2$clusters
+```
+
+
+```{r, fig.height=30, fig.width=15}
+cell_gene2 %>% 
+  gather(gene, expression, -cells, -clusters) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_density_ridges(jittered_points = TRUE) +
+  #geom_jitter(height = 0.2, width = 0.1, alpha = 0.5) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    strip.text = element_text(size = 20)
+    )
+```
+
+
+```{r}
+fraction <- function(x) {
+  return(length(x[x >= 0.5]) / length(x))
+}
+
+mean_cutoff <- function(x) {
+  if (length(x[x >= 0.5]) == 0) {
+    return(0)
+    } else {
+      return(mean(x[x >= 0.5])) 
+      }
+}
+```
+
+
+```{r}
+cell_gene_fraction <- cell_gene %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(fraction) %>%
+  gather(gene, fraction, -clusters) 
+
+cell_gene_mean <- cell_gene %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(mean_cutoff) %>%
+  gather(gene, mean, -clusters) 
+
+cell_gene_sum <- 
+  dplyr::left_join(cell_gene_fraction, cell_gene_mean) 
+
+cell_gene_sum$gene %<>% factor(levels = c("beat-Ia1", "beat-Ia2", "beat-Ib", "beat-IIa", "beat-IIb", "beat-IIIc1", "beat-IIIc2", "beat-IVa", "beat-IVb", "beat-Va", "beat-Vb", "beat-VI", "beat-VII", "side", "side-IIa", "side-IIb", "side-IIc", "side-III", "side-IV", "side-V", "side-VI", "side-VII", "side-VIII"))
+```
+
+
+# Prepare the data for Figs 5G, 12D. 
+```{r}
+cell_gene_fraction[cell_gene_fraction$fraction > 0.2, ] %>%
+  group_by(gene) %>%
+  count() %>%
+  mutate(variability = n/42*100)
+```
+
+
+```{r}
+cell_gene_fraction %>% 
+  ggplot(aes(x=fraction, y=gene)) +
+  geom_density_ridges(jittered_points = TRUE)
+```
+
+
+# Fig 5E. 
+```{r, fig.height=30, fig.width=50}
+cell_gene_sum %>%
+  ggplot(aes(x = clusters, y = gene, color = mean, size = fraction)) +
+  geom_point() +
+  #scale_size_area(max_size = 10) +
+  scale_radius(range = c(0, 30)) +
+  scale_color_gradientn(colors = brewer.pal(9, "YlOrRd")) +
+  #scale_color_gradient(low="yellow", high="red") +
+  xlab("OSN clusters") +
+  ylab("gene") +
+  #labs(title = "ORN over development") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 50, angle = 0, vjust = 0.5, hjust = 0.5),
+    axis.text.y = element_text(size = 40, face = "italic"),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 80),
+    axis.title = element_blank(),
+    legend.title = element_text(size = 70),
+    legend.text = element_text(size = 60),
+    legend.key.size = unit(4, "cm"),
+    strip.text = element_text(size = 80)
+    )
+```
+
+```{r}
+ggsave("beatside_mosquitos.pdf", plot = last_plot(), height = 30, width = 50, units = "in", limitsize = FALSE)
+```
+
+
+# Fig 12B. 
+```{r}
+cell_gene_fraction2 <- cell_gene2 %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(fraction) %>%
+  gather(gene, fraction, -clusters) 
+
+cell_gene_mean2 <- cell_gene2 %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(mean_cutoff) %>%
+  gather(gene, mean, -clusters) 
+
+cell_gene_sum2 <- 
+  dplyr::left_join(cell_gene_fraction2, cell_gene_mean2) 
+
+cell_gene_sum2$gene %<>% factor(levels = c("beat-Ia1", "beat-Ia2", "beat-Ib", "beat-IIa", "beat-IIb", "beat-IIIc1", "beat-IIIc2", "beat-IVa", "beat-IVb", "beat-Va", "beat-Vb", "beat-VI", "beat-VII", "side", "side-IIa", "side-IIb", "side-IIc", "side-III", "side-IV", "side-V", "side-VI", "side-VII", "side-VIII"))
+```
+
+
+```{r, fig.height=30, fig.width=50}
+cell_gene_sum2 %>%
+  ggplot(aes(x = clusters, y = gene, color = mean, size = fraction)) +
+  geom_point() +
+  #scale_size_area(max_size = 10) +
+  scale_radius(range = c(0, 30)) +
+  scale_color_gradientn(colors = brewer.pal(9, "YlOrRd")) +
+  #scale_color_gradient(low="yellow", high="red") +
+  xlab("OSN clusters") +
+  ylab("gene") +
+  #labs(title = "ORN over development") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 60, angle = 0, vjust = 0.5, hjust = 0.5),
+    axis.text.y = element_text(size = 40, face = "italic"),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 80),
+    axis.title = element_blank(),
+    legend.title = element_text(size = 70),
+    legend.text = element_text(size = 60),
+    legend.key.size = unit(4, "cm"),
+    strip.text = element_text(size = 80)
+    )
+```
