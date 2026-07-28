@@ -1,0 +1,75 @@
+PN_type	lineage
+APL	adPN
+APL	APL
+APL	vPN
+D	adPN
+D	NA
+DA1	lPN
+DA1_fru-	lPN
+DA1_fru+	lPN
+DA1_fru+	NA
+DA3	adPN
+DA4l	adPN
+DC2	adPN
+DC2	lPN
+DC3	adPN
+DC3	NA
+DC3 and VA1d	adPN
+DC3 and VA1d	vPN
+DC3 and VA1d	lPN
+DL1	adPN
+DL1	lPN
+DL3	lPN
+DL3	APL
+DL3	NA
+DM2	lPN
+DM2	APL
+DM2	adPN
+DM6	adPN
+DM6	NA
+MARS_19	adPN
+MARS_19	NA
+MARS_19	lPN
+MARS_2	lPN
+MARS_2	adPN
+MARS_25	lPN
+MARS_25	NA
+MARS_25	adPN
+MARS_27	lPN
+MARS_27	NA
+MARS_5	adPN
+MARS_5	lPN
+MARS_7	adPN
+MARS_7	NA
+MARS_9	lPN
+MARS_9	NA
+MARS_9	adPN
+nan	adPN
+nan	lPN
+nan	APL
+nan	NA
+nan	vPN
+VA1d	adPN
+VA1d	NA
+VA1v	adPN
+VA1v	NA
+VA2	adPN
+VA2	APL
+VA5	lPN
+VA5	NA
+VA6	adPN
+VA6	NA
+VA6	lPN
+VC2	lPN
+VC2	NA
+VC2	adPN
+VM2	NA
+VM2	adPN
+VM7 or VM5v #1	adPN
+VM7 or VM5v #1	lPN
+VM7 or VM5v #1	NA
+VM7 or VM5v #2	lPN
+VM7 or VM5v #2	adPN
+VM7 or VM5v #2	NA
+vPN	vPN
+vPN	APL
