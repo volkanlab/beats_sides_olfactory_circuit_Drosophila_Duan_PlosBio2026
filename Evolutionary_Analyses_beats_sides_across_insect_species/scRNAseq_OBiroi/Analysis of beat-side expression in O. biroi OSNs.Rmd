@@ -1,0 +1,332 @@
+---
+title: "Survey the expression of beat/side othorlogs in clonal raider ants Ooceraea biroi"
+output: html_notebook
+---
+
+# Load the packages. 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggridges)
+
+library(RColorBrewer)
+library(viridis)
+
+library(gplots)
+library(pheatmap)
+
+library(grid)
+library(gridExtra)
+
+library(Seurat)
+```
+
+# Prepare the dataset. 
+```{r}
+# The following dataset can be found in https://zenodo.org/records/8280152. Associated to the reference: Brahma et al. 2023, Transcriptional and post-transcriptional control of odorant receptor choice in ants, Curr Biol, 33:5456-5466 e5455.Current Biology. 
+
+mydata <- readRDS("p14_neuron_ids_umap.rds")
+```
+
+
+```{r}
+expression <- as.data.frame(mydata@assays$SCT@data)
+```
+
+
+```{r}
+umap_clusters <- mydata$seurat_clusters
+cell_info <- data.frame(cells = names(umap_clusters), clusters = umap_clusters)
+```
+
+
+
+
+```{r}
+genelist <- c("LOC105277757", 
+              "LOC105281146", 
+              "LOC105278748", 
+              "LOC105278750", 
+              "LOC105284227", 
+              "LOC105285218", 
+              "LOC105275676", 
+              "LOC105279130", 
+              "LOC105282898", 
+              "LOC105278517", 
+              
+              "LOC105275893", 
+              "LOC105288222", 
+              "LOC105278806", 
+              "LOC105274944", 
+              "LOC105274945", 
+              "LOC105275896", 
+              #"LOC113561951", 
+              "LOC105286893", 
+              "LOC105280531", 
+              "LOC105287868")
+```
+
+
+```{r}
+cell_gene <- as.data.frame(t(expression[genelist, ]))
+
+colnames(cell_gene) <- c("beat-I", "beat-II", "beat-IIIa", "beat-IIIb", "beat-IIIc", "beat-IV", "beat-V", "beat-VIa", "beat-VIb", "beat-VII", "side", "side-II", "side-III", "side-IVa", "side-IVb", "side-IVc", "side-VI", "side-VII", "side-VIII")
+
+cell_gene$cells <- cell_info$cells
+cell_gene$clusters <- cell_info$clusters
+```
+
+
+```{r, fig.height=30, fig.width=15}
+cell_gene %>% 
+  gather(gene, expression, -cells, -clusters) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_density_ridges(jittered_points = TRUE) +
+  #geom_jitter(height = 0.2, width = 0.1, alpha = 0.5) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    strip.text = element_text(size = 20)
+    )
+```
+
+```{r}
+fraction <- function(x) {
+  return(length(x[x >= 0.5]) / length(x))
+}
+
+mean_cutoff <- function(x) {
+  if (length(x[x >= 0.5]) == 0) {
+    return(0)
+    } else {
+      return(mean(x[x >= 0.5])) 
+      }
+}
+```
+
+
+```{r}
+cell_gene_fraction <- cell_gene %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(fraction) %>%
+  gather(gene, fraction, -clusters) 
+
+cell_gene_mean <- cell_gene %>%
+  #dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cells) %>%
+  dplyr::group_by(clusters) %>%
+  dplyr::summarize_all(mean_cutoff) %>%
+  gather(gene, mean, -clusters) 
+
+cell_gene_sum <- 
+  dplyr::left_join(cell_gene_fraction, cell_gene_mean) 
+
+cell_gene_sum$gene %<>% factor(levels = c("beat-I", "beat-II", "beat-IIIa", "beat-IIIb", "beat-IIIc", "beat-IV", "beat-V", "beat-VIa", "beat-VIb", "beat-VII", "side", "side-II", "side-III", "side-IVa", "side-IVb", "side-IVc", "side-VI", "side-VII", "side-VIII"))
+```
+
+
+# Prepare the expression breath(variability) for Figs 5G, S12D. 
+```{r}
+cell_gene_sum[cell_gene_sum$fraction > 0.2, ] %>%
+  group_by(gene, ) %>%
+  count %>%
+  mutate(variability = n/37*100)
+```
+
+
+```{r}
+cell_gene_fraction %>% 
+  ggplot(aes(x=fraction, y=gene)) +
+  geom_density_ridges(jittered_points = TRUE)
+```
+
+
+
+
+# Fig 5F. 
+```{r, fig.height=30, fig.width=50}
+cell_gene_sum %>%
+  ggplot(aes(x = clusters, y = gene, color = mean, size = fraction)) +
+  geom_point() +
+  #scale_size_area(max_size = 10) +
+  scale_radius(range = c(0, 30)) +
+  scale_color_gradientn(colors = brewer.pal(9, "YlOrRd")) +
+  #scale_color_gradient(low="yellow", high="red") +
+  xlab("OSN clusters") +
+  ylab("gene") +
+  #labs(title = "ORN over development") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 50, angle = 0, vjust = 0, hjust = 0.5),
+    axis.text.y = element_text(size = 40, face = "italic"),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 80),
+    axis.title = element_blank(),
+    legend.title = element_text(size = 70),
+    legend.text = element_text(size = 60),
+    legend.key.size = unit(4, "cm"),
+    strip.text = element_text(size = 80)
+    )
+```
+
+
+```{r}
+ggsave("beatside_ant.pdf", plot = last_plot(), height = 30, width = 50, units = "in", limitsize = FALSE)
+```
+
+
+
+# Prepare data for Fig S12E. 
+```{r}
+OR_tandem <- as.data.frame(read_csv("OR_tandem.csv"))
+
+Cluster_info <- as.data.frame(read_csv("Cluster_identity_info.csv"))
+```
+
+```{r}
+Cluster_info
+
+Cluster_info <- Cluster_info[!is.na(Cluster_info$TandemID) & !is.na(Cluster_info$Directionality) & Cluster_info$TandemID != 17  & Cluster_info$TandemID != 19  & Cluster_info$TandemID != 51, ]
+
+Cluster_info
+```
+
+
+# New version to plot heatmaps across clusters with pheatmap function.
+```{r}
+global_min <- min(expression[genelist, ])
+
+global_max <- max(expression[genelist, ])
+```
+
+
+```{r}
+#heatmaps <- list()
+
+for (i in 1:nrow(Cluster_info)) {
+  
+  ORlist <- OR_tandem[OR_tandem$TandemID == Cluster_info$TandemID[i], ]$GeneID
+  
+  if (Cluster_info$Directionality[i] == "antisense") {
+    ORlist <- rev(ORlist)
+  }
+  
+  
+  if (Cluster_info$ClusterID[i] %in% c(6, 7)) {
+    threshold <- 1
+  } else if (Cluster_info$ClusterID[i] %in% c(9, 11, 20)) {
+    threshold <- 1.5
+  } else {
+    threshold <- 1.3
+  }
+  
+  genelist_combined <- c(ORlist, genelist)
+  
+  cells_new <- cell_info[cell_info$clusters == Cluster_info$ClusterID[i], ]$cells
+
+  cell_gene_new <- as.data.frame(t(expression[genelist_combined, cells_new]))
+
+  colnames(cell_gene_new)[(length(ORlist)+1):length(genelist_combined)] <- c("beat-I", "beat-II", "beat-IIIa", "beat-IIIb", "beat-IIIc", "beat-IV", "beat-V", "beat-VIa", "beat-VIb", "beat-VII", "side", "side-II", "side-III", "side-IVa", "side-IVb", "side-IVc", "side-VI", "side-VII", "side-VIII")
+  
+  filename <- sprintf("cluster%d_tandem%d.pdf", Cluster_info$ClusterID[i], Cluster_info$TandemID[i])
+  pdf(paste("./heatmap_by_cluster_final/", filename, sep = ""))
+  
+  
+  rowname_cell_gene_new_arranged <- cell_gene_new %>% 
+    mutate(across(1:length(ORlist), ~ ifelse(.x < threshold, 0, .x))) %>% 
+    dplyr::arrange(across(all_of(ORlist))) %>%
+    rownames() 
+
+  cell_gene_new[rowname_cell_gene_new_arranged, ] %>% 
+    as.matrix() %>% 
+    pheatmap(
+      color = magma(25), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = FALSE, 
+      show_colnames = TRUE, 
+      #legend = FALSE, 
+      main = sprintf("ORN Cluster %d, OR tandem %d", Cluster_info$ClusterID[i], Cluster_info$TandemID[i]), 
+      fontsize = 20, 
+      fontsize_col = 14, 
+      angle_col = 90, 
+      border_color = NA, 
+      breaks = seq(0, 2.5, length.out=26), 
+      main_pos = "top"
+      )
+  
+  
+  dev.off()
+  
+}
+```
+
+
+
+
+New version to plot binary heatmaps across clusters with pheatmap function. 
+```{r}
+
+for (i in 1:nrow(Cluster_info)) {
+  
+  ORlist <- OR_tandem[OR_tandem$TandemID == Cluster_info$TandemID[i], ]$GeneID
+  
+  if (Cluster_info$Directionality[i] == "antisense") {
+    ORlist <- rev(ORlist)
+  }
+  
+  
+  if (Cluster_info$ClusterID[i] %in% c(6, 7)) {
+    threshold <- 1
+  } else if (Cluster_info$ClusterID[i] %in% c(9, 11, 20)) {
+    threshold <- 1.5
+  } else {
+    threshold <- 1.3
+  }
+  
+  genelist_combined <- c(ORlist, genelist)
+  
+  cells_new <- cell_info[cell_info$clusters == Cluster_info$ClusterID[i], ]$cells
+
+  cell_gene_new <- as.data.frame(t(expression[genelist_combined, cells_new]))
+
+  colnames(cell_gene_new)[(length(ORlist)+1):length(genelist_combined)] <- c("beat-I", "beat-II", "beat-IIIa", "beat-IIIb", "beat-IIIc", "beat-IV", "beat-V", "beat-VIa", "beat-VIb", "beat-VII", "side", "side-II", "side-III", "side-IVa", "side-IVb", "side-IVc", "side-VI", "side-VII", "side-VIII")
+  
+  filename <- sprintf("cluster%d_tandem%d.pdf", Cluster_info$ClusterID[i], Cluster_info$TandemID[i])
+  pdf(paste("./heatmap_by_cluster_binary/", filename, sep = ""))
+  
+  
+  rowname_cell_gene_new_arranged <- cell_gene_new %>% 
+    mutate(across(1:length(ORlist), ~ ifelse(.x < threshold, 0, .x))) %>% 
+    dplyr::arrange(across(all_of(ORlist))) %>%
+    rownames() 
+
+  cell_gene_new[rowname_cell_gene_new_arranged, ] %>% 
+    as.matrix() %>% 
+    pheatmap(
+      color = magma(25), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = FALSE, 
+      show_colnames = TRUE, 
+      #legend = FALSE, 
+      main = sprintf("ORN Cluster %d, OR tandem %d", Cluster_info$ClusterID[i], Cluster_info$TandemID[i]), 
+      fontsize = 20, 
+      fontsize_col = 14, 
+      angle_col = 90, 
+      border_color = NA, 
+      breaks = seq(0, 0.5, length.out=26), 
+      main_pos = "top"
+      )
+  
+  
+  dev.off()
+  
+}
+```

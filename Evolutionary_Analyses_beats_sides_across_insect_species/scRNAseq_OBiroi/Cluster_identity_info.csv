@@ -1,0 +1,38 @@
+ClusterID,Cluster_identity,TandemID,Directionality 
+0,T17,17,sense; antisense
+1,Singletons,,
+2,"T*, S",,
+3,T45,45,antisense
+4,"OR, GR",,
+5,T37,37,sense
+6,T54,54,antisense
+7,T3,3,sense
+8,T86,86,antisense
+9,"T35, T36",35,antisense
+10,T17,17,sense; antisense
+11,"T33, T34",34,sense
+12,T17,17,sense; antisense
+13,T62,62,antisense
+14,T48,48,antisense
+15,T19,19,sense
+16,T79,79,antisense
+17,T17,17,sense; antisense
+18,T19,19,sense
+19,Singletons,,
+20,"T63, S",63,antisense
+21,T38,38,antisense
+22,T51,51,antisense; sense; antisense
+23,T19,19,sense
+24,T*,,
+25,T57; T58,57,sense
+26,T64,64,sense
+27,T67,67,antisense
+28,T32,32,antisense
+29,"Or, Ir",,
+30,T17,17,sense; antisense
+31,"IR, GR",,
+32,"IR, GR",,
+33,"OR, GR",38,antisense
+34,"OR, IR",,
+35,T60,60,
+36,Singletons,,
