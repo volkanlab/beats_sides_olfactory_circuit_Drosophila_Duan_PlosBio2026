@@ -1,0 +1,443 @@
+---
+title: "Analysing beat-side combinatorial code similarity across ORNs based on the single-cell/nucleus RNAseq data"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+
+library(ggridges)
+library(ggrepel)
+library(ggpubr)
+library(RColorBrewer)
+library(gplots)
+library(ggtext)
+library(ggbeeswarm)
+library(showtext)
+```
+
+
+```{r}
+# Load the count matrix (gene x cell) and the column metadata for cell-type annotation. 
+counts <- read_tsv("./data/counts.tsv") %>% as.data.frame()
+ORNs <- read_tsv("./data/ORNs.tsv") %>% as.data.frame()
+```
+
+```{r}
+# Load the metadata for ORN class and lineage (sensillum, sensillar type) information. 
+ORNs_sensillum <- dplyr::left_join(ORNs, as.data.frame(read_tsv("./data/ORN_class_lineage.tsv")), by = "all_types")
+```
+
+```{r}
+# The cluster that is mapped to the single ORN class. 
+single_ORN_cluster <- read_tsv("./data/single_ORN_cluster.txt") %>%
+  as.data.frame() %$%
+  all_types
+```
+
+```{r}
+# Just to make sure the column of count matrix is identical to the cell ID of the metadata. 
+alltrue <- function (x, y) {
+  result = TRUE
+  for (i in 1:length(x)) {
+    if (x[i] != y[i]) {result = FALSE}
+  }
+  return(result)
+}
+
+alltrue(colnames(counts)[1:3715], ORNs$cell)
+```
+
+```{r}
+ORNs_sensillum_24h <- ORNs_sensillum[ORNs_sensillum$all_types %in% single_ORN_cluster & ORNs_sensillum$stage == "24h", ]
+ORNs_sensillum_42h <- ORNs_sensillum[ORNs_sensillum$all_types %in% single_ORN_cluster & ORNs_sensillum$stage == "42h", ]
+ORNs_sensillum_adult <- ORNs_sensillum[ORNs_sensillum$all_types %in% single_ORN_cluster & ORNs_sensillum$stage == "adult", ]
+```
+
+
+```{r}
+# Run the analysis in the subset of each stage. 
+
+#cell_info <- ORNs_sensillum_24h
+cell_info <- ORNs_sensillum_42h
+#cell_info <- ORNs_sensillum_adult
+```
+
+```{r}
+cells <- cell_info$cell
+glomeruli <- cell_info$all_types
+sensillar_types <- cell_info$sensillar_type
+sensilla <- cell_info$sensillum
+```
+
+```{r}
+cell_info %>%
+  dplyr::group_by(sensillar_type) %>%
+  dplyr::count()
+
+cell_info %>%
+  dplyr::group_by(sensillum) %>%
+  dplyr::count()
+
+cell_info %>%
+  dplyr::group_by(all_types) %>%
+  dplyr::count()
+
+cell_info %>%
+  dplyr::group_by(sensillar_type, sensillum, all_types) %>%
+  dplyr::count()
+```
+
+
+```{r}
+# Filter out the VL1 class that is housed in multiple sensili. 
+cell_info %<>% 
+  dplyr::filter(sensillum != "Ac1_Ac2_Ac4")
+
+
+cell_info %>%
+  dplyr::group_by(sensillar_type, sensillum, all_types) %>%
+  dplyr::count()
+
+
+cells <- cell_info$cell
+glomeruli <- cell_info$all_types
+sensillar_types <- cell_info$sensillar_type
+sensilla <- cell_info$sensillum
+```
+
+
+```{r}
+genelistfile <- "./resources/genelist_beat-side.txt"
+#genelistfile <- "./resources/genelist_IgSF.txt"
+#genelistfile <- "./resources/genelist_CSMs.txt"
+
+genes <- read_tsv(genelistfile) %>% 
+  as.data.frame() %$% 
+  gene
+```
+
+```{r}
+# Comparison based on the whole transcriptome.
+#gene_cell <- counts[, cells]
+
+# Comparison based on the select genes.
+gene_cell <- counts[counts$genename %in% genes, cells]
+```
+
+
+```{r}
+# These two helper functions find the cells with zero values for all the genes of interest (rows). 
+
+allzero <- function (x) {
+  result = TRUE
+  
+  for (i in 1:length(x)) {
+    if (x[i] != 0) {result = FALSE}
+  }
+  
+  return(result)
+}
+
+get_zero_cells <- function (matrix) {
+  zero_cells <- numeric()
+  
+  for (i in 1:ncol(matrix)) {
+    if (allzero(matrix[[i]])) {
+      zero_cells <- append(zero_cells, i)
+      }
+  }
+  
+  return(zero_cells)
+}
+```
+
+```{r}
+zero_cells <- get_zero_cells(gene_cell)
+
+print(length(zero_cells))
+```
+
+```{r}
+# Remove the cells with zero values for all the genes of interest (rows). 
+
+if (length(zero_cells) != 0) {
+  gene_cell <- subset(gene_cell, select = -zero_cells)
+  cell_info <- cell_info[-zero_cells, ]
+  cells <- cell_info$cell
+  glomeruli <- cell_info$all_types
+  sensillar_types <- cell_info$sensillar_type
+  sensilla <- cell_info$sensillum
+}
+```
+
+
+
+```{r}
+gene_cell_cor <- gene_cell %>%
+  as.matrix() %>%
+  cor(method = "spearman")
+```
+
+```{r, fig.asp = 1}
+heatmap.2(gene_cell_cor, 
+          trace = "none", 
+          density.info = "none",
+          col = "bluered",
+          breaks = seq(-1, 1, length.out=15),
+          labRow = FALSE,
+          labCol = FALSE)
+```
+
+
+
+
+```{r}
+# shuffle cell identities
+
+set.seed(2025)
+
+row_order <- sample(1:nrow(gene_cell_cor))
+
+gene_cell_cor_shuffled <- gene_cell_cor[row_order, row_order]
+
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(gene_cell_cor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, gene_cell_cor_shuffled[i, j])
+    
+    if (glomeruli[i] == glomeruli[j]) {
+      relation = append(relation, "within ORN class")
+    } else if (sensilla[i] == sensilla[j]) {
+      relation = append(relation, "within sensillum")
+    } else if (sensillar_types[i] == sensillar_types[j]) {
+      relation = append(relation, "within sensillar type")
+    } else {
+      relation = append(relation, "between sensillar types")
+    }
+    
+    if(j==ndim & i%%10==0) {print(i/ndim*100)}
+  }
+}
+```
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum", "within ORN class"))
+
+#similarity_summary %>% write.table (file = "./analysis/similarity_beatside_42h_shuffled.tsv", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+```{r}
+relation_count <- similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+relation_count
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("between sensillar types", "within ORN class"), 
+                      c("within sensillar type", "within sensillum"), 
+                      c("within sensillar type", "within ORN class"),
+                      c("within sensillum", "within ORN class"))
+
+showtext_auto()
+
+data = similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = c(0.5, 0.6, 0.7, 0.8, 0.9, 1)
+    y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF",
+    "within ORN class" = "#797BB7"
+  )) + 
+  #ylim(NA, 1) +
+  theme_classic() +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_ORN_shuffled.pdf")
+```
+
+
+
+
+```{r}
+# Data, not shuffled.
+
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(gene_cell_cor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, gene_cell_cor[i, j])
+    
+    if (glomeruli[i] == glomeruli[j]) {
+      relation = append(relation, "within ORN class")
+    } else if (sensilla[i] == sensilla[j]) {
+      relation = append(relation, "within sensillum")
+    } else if (sensillar_types[i] == sensillar_types[j]) {
+      relation = append(relation, "within sensillar type")
+    } else {
+      relation = append(relation, "between sensillar types")
+    }
+    
+    if(j==ndim & i%%10==0) {print(i/ndim*100)}
+  }
+}
+```
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum", "within ORN class"))
+```
+
+```{r}
+#similarity_summary %>% write.table (file = "./analysis/similarity_beatside_42h.tsv", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+```{r}
+relation_count <- similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+relation_count
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+# Resample the same number of entries in each relation category and perform the statistics for comparison.
+set.seed(2024)
+
+size = 8000
+
+similarity_summary_resample <- similarity_summary[similarity_summary$relation == relation_count$relation[2], ][sample(1:relation_count$n[2], size, replace=FALSE),] %>%
+  rbind(similarity_summary[similarity_summary$relation == relation_count$relation[1], ][sample(1:relation_count$n[1], size, replace=FALSE),]) %>%
+  rbind(similarity_summary[similarity_summary$relation == relation_count$relation[4], ][sample(1:relation_count$n[4], size, replace=FALSE),]) %>%
+  rbind(similarity_summary[similarity_summary$relation == relation_count$relation[3], ][sample(1:relation_count$n[3], size, replace=FALSE),])
+```
+
+```{r}
+similarity_summary_resample %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_resample %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary_resample)
+```
+
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("between sensillar types", "within ORN class"), 
+                      c("within sensillar type", "within sensillum"), 
+                      c("within sensillar type", "within ORN class"),
+                      c("within sensillum", "within ORN class"))
+
+showtext_auto()
+
+#data = similarity_summary_resample
+data = similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = c(0.5, 0.6, 0.7, 0.8, 0.9, 1)
+    y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF",
+    "within ORN class" = "#797BB7"
+  )) + 
+  #ylim(NA, 1) +
+  theme_classic() +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_ORN.pdf")
+```
+
+```{r}
+data %>%
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean = mean(similarity, na.rm=TRUE)) %>% 
+  ggplot() +
+    geom_line(aes(relation, mean, group=1), color="gray") +
+    geom_point(aes(relation, mean, color=relation), size=4) + 
+    scale_color_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF",
+    "within ORN class" = "#797BB7"
+  )) + 
+    #ylim(0,1) +
+    theme_classic() +
+    theme(axis.text.x=element_blank(), 
+        axis.text.y=element_blank()
+        ) 
+```
+
+
+

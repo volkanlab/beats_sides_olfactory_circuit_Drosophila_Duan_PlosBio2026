@@ -1,0 +1,206 @@
+---
+title: "Visualizing the beat-side expression across ORNs based on the single-cell/nucleus RNAseq data"
+output: html_notebook
+---
+
+
+# Load the packages. 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(RColorBrewer)
+
+library(ggridges) #for geom_density_ridges function
+```
+
+
+# Prepare the dataset. 
+```{r}
+counts <- read_tsv("./data/counts.tsv") %>% as.data.frame()
+ORNs <- read_tsv("./data/ORNs.tsv") %>% as.data.frame()
+```
+
+```{r}
+genes <- read_tsv("./resources/genelist_beat-side.txt", show_col_types = FALSE) %>% 
+      as.data.frame() %$% 
+      gene
+```
+
+```{r}
+bs_cell <- counts[counts$genename %in% genes, ]
+```
+
+```{r}
+bs_cell$genename
+```
+
+```{r}
+rownames(bs_cell) <- c("beat-Ia", 
+                       "side", 
+                       "beat-Ic", 
+                       "beat-Ib", 
+                       "beat-IIIc", 
+                       "side-VII", 
+                       "beat-Vc", 
+                       "beat-Va", 
+                       "beat-Vb", 
+                       "side-IV", 
+                       "beat-IIb", 
+                       "beat-IIa", 
+                       "beat-IV", 
+                       "beat-VI", 
+                       "beat-IIIb", 
+                       "side-III", 
+                       "side-VI", 
+                       "side-V", 
+                       "side-VIII", 
+                       "beat-VII", 
+                       "side-II")
+```
+
+```{r}
+cell_bs <- bs_cell %>%
+  dplyr::select(-genename) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame()
+
+cell_bs$cell <- rownames(cell_bs)
+
+cell_bs <- cell_bs %>%
+  dplyr::left_join(ORNs, by = c("cell" = "cell"))
+```
+
+
+```{r, fig.width = 32, fig.height = 64}
+cell_bs %>% 
+  gather(gene, expression, -cell, -all_types, -stage) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_density_ridges(jittered_points = TRUE) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    #strip.text = element_text(size = 20)
+    )
+
+cell_bs %>% 
+  gather(gene, expression, -cell, -all_types, -stage) %>%
+  ggplot(aes(x = expression, y = gene)) +
+  geom_jitter(height = 0.2, width = 0.1, alpha = 0.5) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 50),
+    legend.title = element_text(size = 20),
+    title = element_text(size = 60),
+    #strip.text = element_text(size = 20)
+    )
+```
+
+
+```{r}
+fraction <- function(x) {
+  return(length(x[x >= 0.5]) / length(x))
+}
+
+mean_cutoff <- function(x) {
+  if (length(x[x >= 0.5]) == 0) {
+    return(0)
+    } else {
+      return(mean(x[x >= 0.5])) 
+      }
+}
+```
+
+```{r}
+cell_bs_fraction <- cell_bs %>%
+  dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cell) %>%
+  dplyr::group_by(all_types, stage) %>%
+  dplyr::summarize_all(fraction) %>%
+  gather(gene, fraction, -all_types, -stage) 
+
+cell_bs_mean <- cell_bs %>%
+  dplyr::filter(all_types != "NaN") %>%
+  dplyr::select(-cell) %>%
+  dplyr::group_by(all_types, stage) %>%
+  dplyr::summarize_all(mean_cutoff) %>%
+  #dplyr::summarize_all(mean) %>%
+  gather(gene, mean, -all_types, -stage) 
+
+cell_bs_sum <- 
+  dplyr::left_join(cell_bs_fraction, cell_bs_mean) 
+
+cell_bs_sum$gene %<>% factor(levels = sort(rownames(bs_cell)))
+
+cell_bs_sum[cell_bs_sum$stage == "42h", ]$stage <- "mid-pupal"
+cell_bs_sum$stage %<>% factor(levels = c("24h", "mid-pupal", "adult"))
+
+type_order <- cell_bs %>%
+  dplyr::filter(all_types != "NaN") %$%
+  all_types %>%
+  unique() %>%
+  sort() %>%
+  rev()
+cell_bs_sum$all_types %<>% factor(levels = type_order)
+```
+
+
+# Figs S3B, 5D. 
+```{r, fig.width = 64, fig.height = 32}
+cell_bs_sum %>%
+  ggplot(aes(x = all_types, y = gene, color = mean, size = fraction)) +
+  geom_point() +
+  #scale_size_area(max_size = 10) +
+  scale_radius(range = c(0, 30)) +
+  scale_color_gradientn(colors = brewer.pal(9, "YlOrRd")) +
+  #scale_color_gradient(low="yellow", high="red") +
+  xlab("ORN type/glomerulus") +
+  ylab("gene") +
+  #labs(title = "ORN over development") +
+  facet_wrap(~stage, strip.position = "top", scales = "free", ncol = 3) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 50, angle = 90, vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size = 40, face = "italic"),
+    axis.ticks.length = unit(0.5, "cm"),
+    #axis.title = element_text(size = 80),
+    axis.title = element_blank(),
+    legend.title = element_text(size = 70),
+    legend.text = element_text(size = 60),
+    legend.key.size = unit(4, "cm"),
+    strip.text = element_text(size = 80)
+    )
+```
+
+
+# Prepare the expression breath(variability) for Figs 5G, S12D. 
+```{r}
+cell_bs_fraction %>% 
+  dplyr::filter(stage == "adult") %>% 
+  ggplot(aes(x=fraction, y=gene)) +
+  geom_density_ridges(jittered_points = TRUE)
+```
+
+
+```{r}
+ncluster <- cell_bs_fraction %>% 
+  dplyr::filter(stage == "adult") %$%
+  all_types %>%
+  unique() %>%
+  length()
+  
+
+cell_bs_fraction %>% 
+  dplyr::filter(stage == "adult") %>%
+  dplyr::filter(fraction > 0.15) %>%
+  group_by(gene, ) %>%
+  count %>%
+  mutate(variability = n / ncluster * 100)
+```
