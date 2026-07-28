@@ -1,0 +1,188 @@
+---
+title: "Linear regressopm of ortholog expression breadth in ORNs between species"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+
+library(ggrepel)   # for non-overlapping text labels
+library(ggpubr)    # for stat_cor() and stat_regline_equation()
+library(ggtext)
+```
+
+
+```{r}
+df <- read_csv("linear regression of ortholog expression breadth.csv")
+```
+
+
+```{r}
+df %>%
+  ggplot(aes(x = fly, y = mosquito)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>D. mel</i> ORNs", 
+       y = "Expression breadth in <i>A. aeg</i> ORNs") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    #axis.title.x = element_text(size = 12, face = "italic"),
+    #axis.title.y = element_text(size = 12, face = "italic"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+
+ggsave("ExpressionBreadth_LinearReg_fly_mosq.pdf")
+```
+
+```{r}
+df %>%
+  ggplot(aes(x = fly, y = ant)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>D. mel</i> ORNs", 
+       y = "Expression breadth in <i>O. bir</i> ORNs") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+
+ggsave("ExpressionBreadth_LinearReg_fly_ant.pdf")
+```
+
+
+```{r}
+df %>%
+  ggplot(aes(x = mosquito, y = ant)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>A. aeg</i> ORNs", 
+       y = "Expression breadth in <i>O. bir</i> ORNs") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+
+ggsave("ExpressionBreadth_LinearReg_mosq_ant.pdf")
+```
+
+
+```{r}
+df %>%
+  ggplot(aes(x = fly_gal4_antenna, y = mosquito)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>D. mel</i> ORNs (GAL4 labeling)", 
+       y = "Expression breadth in <i>A. aeg</i> ORNs") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    #axis.title.x = element_text(size = 12, face = "italic"),
+    #axis.title.y = element_text(size = 12, face = "italic"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+
+
+df %>%
+  ggplot(aes(x = fly_gal4_antenna, y = ant)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>D. mel</i> ORNs (GAL4 labeling)", 
+       y = "Expression breadth in <i>O. bir</i> ORNs") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+
+
+df %>%
+  ggplot(aes(x = fly_gal4_antenna, y = fly)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = TRUE, level = 0.95, linewidth = 0.8, linetype = "solid") +
+  geom_text_repel(aes(label = gene), size = 4, fontface = "italic", max.overlaps = Inf) +
+  stat_regline_equation(
+    label.x.npc = "left", 
+    label.y.npc = 0.98,     
+    size = 5) +
+  stat_cor(
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = 0.90,
+    size = 5) +
+  labs(x = "Expression breadth in <i>D. mel</i> ORNs (GAL4 labeling)", 
+       y = "Expression breadth in <i>D. mel</i> ORNs (single-cell)") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_markdown(size = 12),
+    axis.title.y = element_markdown(size = 12)
+  )
+```
+
+
+
