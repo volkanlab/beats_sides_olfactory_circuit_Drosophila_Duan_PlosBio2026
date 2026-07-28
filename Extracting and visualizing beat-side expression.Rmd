@@ -1,0 +1,169 @@
+---
+title: "Four-stage antennal RNA-seq analysis Barish 2018"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(readxl)
+
+library(gplots)
+library(RColorBrewer)
+library(viridisLite)
+```
+
+
+```{r}
+larval <- read_excel("larval.xls") %>% as.data.frame()
+apf8 <- read_excel("8hrAPF.xls") %>% as.data.frame()
+apf40 <- read_excel("40hrAPF.xls") %>% as.data.frame()
+adult <- read_excel("adult.xls") %>% as.data.frame()
+
+genes <- read_tsv("genelist_beat-side.txt") %>% as.data.frame() %$% gene
+```
+
+
+```{r}
+larval %<>% dplyr::rename(genename = ...1, larval=baseMean)
+apf8 %<>% dplyr::rename(genename = ...1, APF8=baseMean)
+apf40 %<>% dplyr::rename(genename = ...1, APF40=baseMean)
+adult %<>% dplyr::rename(genename = ...1, adult=baseMean)
+```
+
+
+```{r}
+df <- larval[c("genename", "larval")] %>% 
+  dplyr::left_join(apf8[c("genename", "APF8")], by=c("genename"="genename")) %>%
+  dplyr::left_join(apf40[c("genename", "APF40")], by=c("genename"="genename")) %>%
+  dplyr::left_join(adult[c("genename", "adult")], by=c("genename"="genename")) 
+```
+
+
+```{r}
+kug <- df[df$genename == "kug", ] %>%
+  pivot_longer(cols = !genename,
+               names_to = "stage",
+               values_to = "expression")
+
+kug$stage <- c("larval", "8h APF", "40h APF", "adult")
+kug$stage %<>% factor(levels = c("larval", "8h APF", "40h APF", "adult"))
+```
+
+```{r}
+kug %>% ggplot(aes(x=stage, y=log2(expression+1))) +
+  geom_line(aes(group=1)) +
+  geom_point(color="blue", size = 5) +
+  ylab("relative expression") +
+  #labs(title = "fat2 expression in developing antenna") +
+  labs(title = expression(~italic("fat2")~ "expression in developing antenna")) +
+  theme_linedraw() + 
+  theme(aspect.ratio = 1) +
+  theme(
+    title=element_text(size = 14),
+    axis.text=element_text(size = 12),
+    axis.title.y=element_text(size = 14),
+    axis.title.x=element_blank(),
+  )
+```
+
+
+
+```{r}
+#df <- df[df$genename %in% genes, ]
+
+df
+```
+
+
+
+```{r}
+df[df$genename %in% c("CG12484", 
+                      "CG12950",
+                      "CG14372",
+                      "CG34113", 
+                      "CG34114",
+                      "CG34371",
+                      "CG42313"), ]$genename <- c("side-VIII", 
+                                                  "side-VII", 
+                                                  "side-IV", 
+                                                  "side-III", 
+                                                  "side-VI", 
+                                                  "side-V", 
+                                                  "side-II")
+```
+
+
+```{r}
+rownames(df) <- df$genename
+```
+
+
+```{r, fig.asp=(14/(4*2))}
+df[1:14, -1] %>%
+  as.matrix() %>%
+  +1 %>%
+  log2() %>%
+  heatmap.2(
+          Colv = FALSE,
+          dendrogram = "none",
+          col = brewer.pal(9, "YlGnBu"),
+          trace = "none",
+          cexRow = 1,  # Font size for row labels
+          cexCol = 1,  # Font size for column labels
+          key = TRUE,
+          density.info = "none"
+          )
+```
+
+
+
+
+```{r, fig.asp=(8/(4*2))}
+df[15:22, -1] %>%
+  as.matrix() %>%
+  +1 %>%
+  log2() %>%
+  heatmap.2(
+          Colv = FALSE,
+          dendrogram = "none",
+          col = brewer.pal(9, "YlGnBu"),
+          trace = "none",
+          cexRow = 1,  # Font size for row labels
+          cexCol = 1,  # Font size for column labels
+          key = TRUE,
+          density.info = "none"
+          )
+```
+
+
+
+
+```{r, fig.asp=1.5}
+pdf("beat-side antennal RNAseq heatmap.pdf", width = 30, height = 36)  
+
+df_mtx <- df[sort(rownames(df)), -1] %>%
+  as.matrix() %>%
+  +1 %>%
+  log2()
+
+heatmap.2(df_mtx, 
+          Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = "none",
+          col = brewer.pal(9, "YlGnBu"),
+          trace = "none",
+          colsep = 1:ncol(df_mtx),
+          rowsep = 1:nrow(df_mtx),
+          sepcolor = "white", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 4,  # Font size for row labels
+          cexCol = 4,  # Font size for column labels
+          key = TRUE,
+          density.info = "none"
+          )
+
+dev.off()
+```
+
+
