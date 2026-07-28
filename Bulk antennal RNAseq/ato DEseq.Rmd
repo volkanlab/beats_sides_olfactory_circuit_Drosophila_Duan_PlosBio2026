@@ -1,0 +1,83 @@
+---
+title: "Atonal mutants antennal RNAseq"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggrepel)
+```
+
+```{r}
+ato_DEG <- read_csv("ato mutants.csv") %>% as.data.frame()
+genes <- read_tsv("genelist_beat-side.txt") %>% as.data.frame() %$% gene
+```
+
+
+```{r}
+ato_DEG[ato_DEG$Symbol %in% genes, ]
+```
+
+
+```{r}
+df <- ato_DEG[ato_DEG$Symbol %in% genes, ]
+```
+
+
+```{r}
+df[df$Symbol %in% c("CG42313", 
+                    "CG14372", 
+                    "CG34371", 
+                    "CG34114", 
+                    "CG34113", 
+                    "CG12950", 
+                    "CG12484"), ]$Symbol <- c("side-II", 
+                                              "side-IV", 
+                                              "side-V", 
+                                              "side-VI", 
+                                              "side-III", 
+                                              "side-VII", 
+                                              "side-VIII")
+```
+
+
+```{r}
+df
+```
+
+
+
+```{r}
+df$change <- "not significant"
+
+df[df$log2FC > 0 & df$FDR <= 0.05, ]$change <- "up"
+df[df$log2FC < 0 & df$FDR <= 0.05, ]$change <- "down"
+```
+
+
+
+```{r}
+ggplot() +
+  geom_point(data = ato_DEG, mapping = aes(x = log2FC, y = -log10(FDR)), color = "gray85", size = 1) +
+  geom_point(data = df, mapping = aes(x = log2FC, y = -log10(FDR), color = change), size = 2) +
+  geom_vline(xintercept = c(-0.5, 0.5), col = "gray60", linetype = "dashed") +
+  geom_hline(yintercept = -log10(0.05), col = "gray60", linetype = "dashed") +
+  scale_color_manual(values = c(
+   "down" = "blue", 
+   "not significant" = "black", 
+   "up" = "red")) +
+  geom_text_repel(data = df, mapping = aes(x = log2FC, y = -log10(FDR), label = Symbol), fontface = "italic") +
+  ylim(0, 10) +
+  xlim(-6, 2) +
+  xlab(expression("log2FC(" ~italic("atonal")~ "-/- vs WT )"))+
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(
+    axis.text=element_text(size = 12),
+    axis.title=element_text(size = 14),
+    legend.title=element_text(size = 14),
+    legend.text=element_text(size = 12)
+  )
+```
+
