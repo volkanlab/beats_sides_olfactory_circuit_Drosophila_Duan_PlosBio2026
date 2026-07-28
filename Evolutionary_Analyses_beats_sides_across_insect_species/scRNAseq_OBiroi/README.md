@@ -4,4 +4,4 @@ Brahma et al. 2023, Transcriptional and post-transcriptional control of odorant 
 
 The following dataset can be found in https://zenodo.org/records/8280152. 
 
-*** Alternatively, the large .rds files can be accessed at https://zenodo.org/records/21652764. 
+*** Alternatively, the large .rds files can be accessed at https://zenodo.org/records/21652764 (the corresponding folder name remains identical). 
