@@ -1,0 +1,139 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ape)
+library(ggtree)
+
+library(tidyverse)
+library(magrittr)
+
+library(stringr)
+```
+
+
+```{r}
+tree_beats <- read.tree("phylotree_all_beats.txt")
+```
+
+```{r, fig.height=20}
+plot(tree_beats)
+```
+
+```{r}
+tree_beats$tip.label
+```
+
+```{r}
+str_extract(tree_beats$tip.label, "(?<=_)[^_]+$")
+```
+
+```{r}
+species_info <- data.frame(node = 1:length(tree_beats$tip.label), 
+                           species = str_extract(tree_beats$tip.label, "(?<=_)[^_]+$"), 
+                           UniProtID = str_extract(tree_beats$tip.label, "(?<=tr\\|)[^|]+"))
+
+species_info$species %<>% factor(levels = c("DROME", "AEDAE", "OOCBI"))
+```
+
+
+```{r}
+Beat_name <- data.frame(UniProtID = c("X2J8L2", "Q8MS18", "Q9VJM4", "Q9BMG9", "Q9VEL7", "M9MRJ2", "Q9VJF7", "Q8SY13", "A0A0B4KGP4", "Q9VG24", "Q9VG19", "Q9VG28", "Q9VAV8", "Q9VBC9"), 
+           genename = c("Beat-Ia", "Beat-Ib", "Beat-Ic", "Beat-IIa", "Beat-IIb", "Beat-IIIa", "Beat-IIIb", "Beat-IIIc", "Beat-IV", "Beat-Va", "Beat-Vb", "Beat-Vc", "Beat-VI", "Beat-VII"))
+```
+
+
+```{r}
+tree_beats_annotated_df <- left_join(fortify(tree_beats), species_info, by = c("node" = "node")) %>% 
+  left_join(Beat_name, by = c("UniProtID" = "UniProtID"))
+
+tree_beats_annotated <- as.phylo(tree_beats_annotated_df)
+```
+
+
+```{r, fig.width=12}
+ggtree(tree_beats_annotated_df) +
+  geom_tree(aes(color = species)) +
+  geom_tippoint(aes(color = species)) +
+  geom_tiplab(aes(label = UniProtID), align = TRUE) +
+  scale_color_manual(values = c("DROME" = "darkorchid4", "AEDAE" = "darkseagreen", "OOCBI" = "cornflowerblue")) +
+  geom_text(aes(label = genename), hjust = 4, vjust = -0.1, nudge_x = 0.05) +
+  geom_hilight(node=52, fill="gray", alpha=0.2) + 
+  geom_hilight(node=48, fill="brown4", alpha=0.2) +
+  geom_hilight(node=44, fill="gray", alpha=0.2) +
+  geom_hilight(node=41, fill="brown4", alpha=0.2) +
+  geom_hilight(node=59, fill="gray", alpha=0.2) +
+  geom_hilight(node=66, fill="brown4", alpha=0.2) +
+  geom_hilight(node=69, fill="gray", alpha=0.2) 
+```
+
+
+```{r}
+ggsave("beats_tree.pdf", plot = last_plot(), width = 12, units = "in")
+```
+
+
+
+```{r}
+tree_sides <- read.tree("phylotree_all_sides.txt")
+```
+
+```{r, fig.height=20}
+plot(tree_sides)
+```
+
+
+```{r}
+fortify(tree_sides)$node
+fortify(tree_sides)$label
+tree_sides$tip.label
+str_extract(tree_sides$tip.label, "(?<=_)[^_]+$")
+```
+
+```{r}
+species_info <- data.frame(node = 1:length(tree_sides$tip.label), 
+                           species = str_extract(tree_sides$tip.label, "(?<=_)[^_]+$"), 
+                           UniProtID = str_extract(tree_sides$tip.label, "(?<=tr\\|)[^|]+"))
+
+species_info$species %<>% factor(levels = c("DROME", "AEDAE", "OOCBI"))
+```
+
+
+```{r}
+Side_name <- data.frame(
+  UniProtID = c("A0A0B4K7N1", "A0A9F2H0X3", "Q0KIB0", "Q9VFU7", "A0A0C4DH96", "Q0KI85", "Q9VH85", "A8DYJ6"), 
+  genename = c("Side", "Side-II", "Side-III", "Side-IV", "Side-V", "Side-VI", "Side-VII", "Side-VIII"))
+```
+
+
+```{r}
+tree_sides_annotated_df <- left_join(fortify(tree_sides), species_info, by = c("node" = "node")) %>% 
+  left_join(Side_name, by = c("UniProtID" = "UniProtID"))
+
+tree_sides_annotated <- as.phylo(tree_sides_annotated_df)
+```
+
+
+```{r, fig.width=12}
+ggtree(tree_sides_annotated_df) +
+  geom_tree(aes(color = species)) +
+  geom_tippoint(aes(color = species)) +
+  geom_tiplab(aes(label = UniProtID), align = TRUE) +
+  scale_color_manual(values = c("DROME" = "darkorchid4", "AEDAE" = "darkseagreen", "OOCBI" = "cornflowerblue")) +
+  geom_text(aes(label = genename), hjust = 6, vjust = -0.1, nudge_x = 0.05) +
+  geom_hilight(node=39, fill="gray", alpha=0.2) + 
+  geom_hilight(node=37, fill="brown4", alpha=0.2) +
+  geom_hilight(node=34, fill="gray", alpha=0.2) + 
+  geom_hilight(node=33, fill="brown4", alpha=0.2) +
+  geom_hilight(node=41, fill="gray", alpha=0.2) + 
+  geom_hilight(node=43, fill="brown4", alpha=0.2) +
+  geom_hilight(node=47, fill="gray", alpha=0.2) +
+  geom_hilight(node=51, fill="brown4", alpha=0.2) 
+```
+
+```{r, fig.width=12}
+ggsave("sides_tree.pdf", plot = last_plot(), width = 12, units = "in")
+```
+
