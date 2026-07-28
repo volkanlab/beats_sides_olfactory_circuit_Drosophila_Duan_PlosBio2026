@@ -4,4 +4,4 @@ Herre, et al, 2022, Non-canonical odor coding in the mosquito. Cell. 185:3104-31
 
 The datasets could be found in https://zenodo.org/records/6981677 and https://zenodo.org/records/5818952, respectively. 
 
-*** Alternatively, the large .rds files can be accessed at https://zenodo.org/records/21652764 (the corresponding folder name remains identical).
+*** Alternatively, the large .rds files can be accessed at https://zenodo.org/records/21652764 (the corresponding folder name remains identical). 
