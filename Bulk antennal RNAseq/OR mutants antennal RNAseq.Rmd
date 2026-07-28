@@ -1,0 +1,82 @@
+---
+title: "Or mutants antennal RNAseq"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggrepel)
+library(readxl)
+```
+
+
+```{r}
+anOrMut <- read_excel("Table S1_count-rpkm-DESeq_OR mutant antenna.xlsx", 
+                      sheet = 1, 
+                      col_types = c(rep("text", 2), rep("numeric", 8))) %>% as.data.frame()
+```
+
+
+```{r}
+genes <- read_tsv("genelist_beat-side.txt") %>% as.data.frame() %$% gene
+#CSM <- read_csv("CSM.csv") %>% as.data.frame()
+#IgSF <- read_csv("IgSF.csv") %>% as.data.frame()
+```
+
+
+```{r}
+df <- anOrMut[c("genename", "Or47b_log2fc", "Or47b_padj")]
+#df <- anOrMut[c("genename", "Or67d_log2fc", "Or67d_padj")]
+#df <- anOrMut[c("genename", "FruM_log2fc", "FruM_padj")]
+
+colnames(df) <- c("genename", "log2FC", "FDR")
+```
+
+
+```{r}
+df_bs <- df[df$genename %in% genes, ]
+```
+
+
+```{r}
+df
+df_bs
+```
+
+
+```{r}
+df_bs$change <- "not significant"
+
+df_bs[df_bs$log2FC > 0 & df_bs$FDR <= 0.05, ]$change <- "up"
+df_bs[df_bs$log2FC < 0 & df_bs$FDR <= 0.05, ]$change <- "down"
+```
+
+
+```{r}
+ggplot() +
+  geom_point(data = df, mapping = aes(x = log2FC, y = -log10(FDR)), color = "gray85", size = 1) +
+  geom_point(data = df_bs, mapping = aes(x = log2FC, y = -log10(FDR), color = change), size = 2) +
+  geom_vline(xintercept = c(-0.5, 0.5), col = "gray60", linetype = "dashed") +
+  geom_hline(yintercept = -log10(0.05), col = "gray60", linetype = "dashed") +
+  scale_color_manual(values = c(
+   "down" = "blue", 
+   "not significant" = "black", 
+   "up" = "red")) +
+  geom_text_repel(data = df_bs, mapping = aes(x = log2FC, y = -log10(FDR), label = genename), 
+                  fontface = "italic",
+                  #xlim = c(NA, Inf),
+                  #ylim = c(-Inf, Inf)
+                  ) +
+  ylim(0, 6) +
+  xlim(-1.5, 1.5) +
+  xlab(expression("log2FC(" ~italic("FruM")~ "-/- vs WT )"))+
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(
+    axis.text=element_text(size = 12),
+    axis.title=element_text(size = 14),
+    legend.title=element_text(size = 14),
+    legend.text=element_text(size = 12)
+  )
+```
