@@ -1,0 +1,733 @@
+---
+title: "beat-side GAL4 in PNs"
+output: html_notebook
+---
+
+This analysis was based on the GAL4 expression pattern data updated in May 2026. 
+
+# Load packages. 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(gplots)
+library(RColorBrewer)
+library(ggpubr)
+
+library(pheatmap)
+```
+
+
+# Fig 3. Load the dataset and run the analyses based on the binary expression matrix. 
+```{r}
+df <- read_csv("PN beat-side expression matrix_2026_v2.csv") %>% as.data.frame() 
+```
+
+```{r}
+df <- df[!is.na(df$Lineage), ]
+```
+
+```{r}
+#For binary analysis in Fig 2, set all non-zero values to 1. For the analysis in Fig S8 based on the binned expression levels, keep the original matrix. 
+df[, -(1:5)] <- (df[, -(1:5)] != 0) * 1
+```
+
+```{r}
+mtx <- df[c("beat-Ia", 
+            "beat-Ib",
+            "beat-Ic",
+            "beat-IIa",
+            "beat-IIb",
+            "beat-IIIa", 
+            "beat-IIIb",
+            "beat-IIIc",
+            "beat-IV",
+            "beat-Va", 
+            "beat-Vc",
+            "beat-VI", 
+            "beat-VII",
+            "side", 
+            "side-II", 
+            "side-III",
+            "side-IV",
+            "side-V",
+            "side-VI",
+            "side-VIII")] %>% as.matrix()
+
+rownames(mtx) <- df[["Glomerulus"]]
+```
+
+
+## Fig 3G, H. Plot the adPN and lPN lineages seperately and order the PN class based on the birth sequence. 
+```{r}
+pnorder_ad <- c("DP1m", "VL2p", "DA4l", "VM4", "VA6", "VL2a", "DC1", "VA7l", "VA2", "DM4", "DL5", "VM3", "DM3", "DL4", "DL1", "DA3", "DC2", "D", "VA3", "DC3", "VA1d", "VM7v", "VM7d", "VM2", "DM6", "VA1v", "VC4", "VM5d", "VM5v", "VC3", "DL2v", "DL2d")
+
+pnorder_l <- c("VA4", "VC2", "VC1", "DM1", "DM2", "VA5", "VA7m", "DA1", "DL3", "VM1", "DA2", "DM5")
+```
+
+```{r}
+mtx_order_ad <- mtx[pnorder_ad, ]
+mtx_order_l <- mtx[pnorder_l, ]
+```
+
+
+### Fig 3G, H. Expression heatmap. 
+```{r, fig.width = 30, fig.height = 36}
+#pdf("heatmap_revision_v2_PNorder_adPN.pdf", width = 30,height = 36)  
+
+heatmap.2(mtx_order_ad, 
+          Rowv = FALSE,
+          Colv = TRUE,
+          dendrogram = "none", 
+          col = colorRampPalette(c("white", "dodgerblue"))(2),
+          trace = "none",
+          colsep = 0:ncol(mtx_order_ad),
+          rowsep = 0:nrow(mtx_order_ad),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 3,  # Font size for column labels
+          key = FALSE
+          )
+
+#legend("topleft", legend = unique(df$Lineage), fill = unique(row_colors), title = "Lineage", cex = 5)
+
+#dev.off() 
+
+
+#pdf("heatmap_revision_v2_PNorder_lPN.pdf", width = 30,height = 36)  
+
+heatmap.2(mtx_order_l, 
+          Rowv = FALSE,
+          Colv = TRUE,
+          dendrogram = "none", 
+          col = colorRampPalette(c("white", "dodgerblue"))(2),
+          trace = "none",
+          colsep = 0:ncol(mtx_order_l),
+          rowsep = 0:nrow(mtx_order_l),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 3,  # Font size for column labels
+          key = FALSE
+          )
+
+#legend("topleft", legend = unique(df$Lineage), fill = unique(row_colors), title = "Lineage", cex = 5)
+
+#dev.off()  
+```
+
+
+### Fig 3G, H. Correlation heatmap. 
+```{r}
+mtx_order_ad_cor <- cor(t(mtx_order_ad))
+
+mtx_order_l_cor <- cor(t(mtx_order_l))
+```
+
+```{r, fig.asp=1}
+#pdf("cormatrix_spectrum_v2_PNorder_adPN.pdf") 
+
+pheatmap(mtx_order_ad_cor,
+      color = colorRampPalette(c("skyblue2", "white", "tomato2"))(50), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = TRUE, 
+      show_colnames = TRUE, 
+      fontsize = 14, 
+      angle_col = 90, 
+      border_color = "gray", 
+      breaks = seq(-0.4, 1, length.out=51), 
+      )
+
+#dev.off() 
+
+
+#pdf("cormatrix_spectrum_v2_PNorder_lPN.pdf") 
+
+pheatmap(mtx_order_l_cor,
+      color = colorRampPalette(c("skyblue2", "white", "tomato2"))(50), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = TRUE, 
+      show_colnames = TRUE, 
+      fontsize = 14, 
+      angle_col = 90, 
+      border_color = "gray", 
+      breaks = seq(-0.4, 1, length.out=51), 
+      )
+
+#dev.off() 
+```
+
+
+## Fig 3B. 
+```{r, fig.width = 30, fig.height = 36}
+row_colors <- brewer.pal(length(unique(df$Lineage)), "Set2")[as.numeric(as.factor(df$Lineage))]
+
+
+#pdf("heatmap_spectrum_v2_OR.pdf", width = 30, height = 36)  
+
+heatmap.2(mtx, 
+          col = colorRampPalette(c("white", "dodgerblue"))(2),
+          trace = "none",
+          RowSideColors = row_colors,
+          colsep = 0:ncol(mtx),
+          rowsep = 0:nrow(mtx),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 3,  # Font size for column labels
+          key = FALSE
+          )
+
+legend("topleft", legend = unique(df$Lineage), fill = unique(row_colors), title = "Lineage", cex = 5)
+
+#dev.off()
+```
+
+
+## Fig 3C
+```{r}
+# Exclude the vPN glomerulus. 
+df <- df[df$Lineage != "vPN", ]
+
+mtx <- df[-c(1, 2, 3, 4, 5)] %>% as.matrix()
+
+rownames(mtx) <- df[["Glomerulus"]]
+
+mtx_rcor <- cor(t(mtx))
+```
+
+
+```{r}
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(mtx_rcor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, mtx_rcor[i, j])
+    
+    if (df$Lineage[i] == df$Lineage[j]) {
+        relation = append(relation, "within lineage")
+    } else {
+        relation = append(relation, "between lineages")
+        }
+  }
+}
+```
+
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between lineages", "within lineage"))
+
+#write_csv(similarity_summary, "Fig 3C_PN_similarity_summary.csv")
+```
+
+
+```{r}
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between lineages", "within lineage"))
+```
+
+```{r}
+#show text_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between lineages" = "#9BC985",
+    "within lineage" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_v2.pdf")
+```
+
+
+## Fig 3D. 
+```{r}
+within_all <- numeric()
+between_all <- numeric()
+
+# Run multiple times of shuffling. 
+for (x in 1776:2023) {
+  
+  set.seed(x)
+  
+  df_shuffled <- df[sample(1:nrow(df)), ]
+  
+  mtx <- df_shuffled[-c(1, 2, 3, 4, 5)] %>% as.matrix()
+  
+  mtx_rcor <- cor(t(mtx))
+  
+  within <- numeric()
+  between <- numeric()
+  
+  ndim = nrow(mtx_rcor)
+  
+  for (i in 1:(ndim-1)) {
+    
+    for (j in (i+1):ndim) {
+      
+      if (df$Lineage[i] == df$Lineage[j]) {
+        within = append(within, mtx_rcor[i, j])
+       } else {
+        between = append(between, mtx_rcor[i, j])}
+    }
+    
+  }
+  
+  within_all = append(within_all, mean(within))
+  between_all = append(between_all, mean(between))
+  
+}
+
+# Summary of all shuffling runs.
+similarity_summary_all <- data.frame(similarity = c(within_all, between_all), 
+                                 relation = c(rep("within lineage", length(within_all)), 
+                                              rep("between lineages", length(between_all))))
+
+# Summary of the last one (with seed = 2023) as the representative shuffling result. 
+similarity_summary <- data.frame(similarity = c(within, between), 
+                                 relation = c(rep("within lineage", length(within)), 
+                                              rep("between lineages", length(between))))
+
+similarity_summary_all$relation %<>% factor(levels = c("between lineages", "within lineage"))
+similarity_summary$relation %<>% factor(levels = c("between lineages", "within lineage"))
+
+#write_csv(similarity_summary, "Fig 3D_PN_similarity_summary_shuffled.csv")
+```
+
+
+```{r}
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary_all)
+
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between lineages", "within lineage"))
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between lineages" = "#9BC985",
+    "within lineage" = "#B595BF"
+  )) + 
+  #ylim(-0.5, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_v2_shuffle.pdf")
+```
+
+
+
+
+# Fig S8. Load the dataset and run the analyses based on the binned expression matrix. 
+```{r}
+df <- read_csv("PN beat-side expression matrix_2026_v2.csv") %>% as.data.frame()
+```
+
+```{r}
+df <- df[!is.na(df$Lineage), ]
+```
+
+```{r}
+mtx <- df[c("beat-Ia", 
+            "beat-Ib",
+            "beat-Ic",
+            "beat-IIa",
+            "beat-IIb",
+            "beat-IIIa", 
+            "beat-IIIb",
+            "beat-IIIc",
+            "beat-IV",
+            "beat-Va", 
+            "beat-Vc",
+            "beat-VI", 
+            "beat-VII",
+            "side", 
+            "side-II", 
+            "side-III",
+            "side-IV",
+            "side-V",
+            "side-VI",
+            "side-VIII")] %>% as.matrix()
+
+rownames(mtx) <- df[["Glomerulus"]]
+```
+
+
+## Fig S8D, E. 
+```{r}
+pnorder_ad <- c("DP1m", "VL2p", "DA4l", "VM4", "VA6", "VL2a", "DC1", "VA7l", "VA2", "DM4", "DL5", "VM3", "DM3", "DL4", "DL1", "DA3", "DC2", "D", "VA3", "DC3", "VA1d", "VM7v", "VM7d", "VM2", "DM6", "VA1v", "VC4", "VM5d", "VM5v", "VC3", "DL2v", "DL2d")
+
+pnorder_l <- c("VA4", "VC2", "VC1", "DM1", "DM2", "VA5", "VA7m", "DA1", "DL3", "VM1", "DA2", "DM5")
+```
+
+```{r}
+mtx_order_ad <- mtx[pnorder_ad, ]
+mtx_order_l <- mtx[pnorder_l, ]
+```
+
+```{r}
+mtx_order_ad_cor <- cor(t(mtx_order_ad))
+
+mtx_order_l_cor <- cor(t(mtx_order_l))
+```
+
+```{r, fig.asp=1}
+#pdf("cormatrix_spectrum_v2_PNorder_adPN.pdf") 
+
+pheatmap(mtx_order_ad_cor,
+      color = colorRampPalette(c("skyblue2", "white", "tomato2"))(50), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = TRUE, 
+      show_colnames = TRUE, 
+      fontsize = 14, 
+      angle_col = 90, 
+      border_color = "gray", 
+      #breaks = seq(-0.4, 1, length.out=51), 
+      )
+
+#dev.off() 
+
+
+#pdf("cormatrix_spectrum_v2_PNorder_lPN.pdf") 
+
+pheatmap(mtx_order_l_cor,
+      color = colorRampPalette(c("skyblue2", "white", "tomato2"))(50), 
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = TRUE, 
+      show_colnames = TRUE, 
+      fontsize = 14, 
+      angle_col = 90, 
+      border_color = "gray", 
+      #breaks = seq(-0.4, 1, length.out=51), 
+      )
+
+#dev.off()
+```
+
+
+## Fig S8A. 
+```{r, fig.width = 30, fig.height = 36}
+row_colors <- brewer.pal(length(unique(df$Lineage)), "Set2")[as.numeric(as.factor(df$Lineage))]
+
+pal <- brewer.pal(4, "Blues")
+pal[1] <- "white"
+
+#pdf("heatmap_spectrum_v2_OR.pdf", width = 30, height = 36)  
+
+heatmap.2(mtx, 
+          col = pal,
+          trace = "none",
+          RowSideColors = row_colors,
+          colsep = 0:ncol(mtx),
+          rowsep = 0:nrow(mtx),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 3,  # Font size for column labels
+          key = FALSE
+          )
+
+legend("topleft", legend = unique(df$Lineage), fill = unique(row_colors), title = "Lineage", cex = 5)
+
+#dev.off()
+```
+
+
+## Fig S8B. 
+```{r}
+# Exclude the vPN class.
+df <- df[df$Lineage != "vPN", ]
+
+mtx <- df[-c(1, 2, 3, 4, 5)] %>% as.matrix()
+
+rownames(mtx) <- df[["Glomerulus"]]
+
+mtx_rcor <- cor(t(mtx))
+```
+
+
+```{r}
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(mtx_rcor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, mtx_rcor[i, j])
+    
+    if (df$Lineage[i] == df$Lineage[j]) {
+        relation = append(relation, "within lineage")
+    } else {
+        relation = append(relation, "between lineages")
+        }
+  }
+}
+```
+
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between lineages", "within lineage"))
+
+#write_csv(similarity_summary, "Fig S8B_PN_similarity_summary_binned.csv")
+```
+
+
+```{r}
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between lineages", "within lineage"))
+```
+
+```{r}
+#show text_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between lineages" = "#9BC985",
+    "within lineage" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_v2.pdf")
+```
+
+
+## Fig S8C
+```{r}
+within_all <- numeric()
+between_all <- numeric()
+
+# Run multiple times of shuffling. 
+for (x in 1776:2023) {
+  
+  set.seed(x)
+  
+  df_shuffled <- df[sample(1:nrow(df)), ]
+  
+  mtx <- df_shuffled[-c(1, 2, 3, 4, 5)] %>% as.matrix()
+  
+  mtx_rcor <- cor(t(mtx))
+  
+  within <- numeric()
+  between <- numeric()
+  
+  ndim = nrow(mtx_rcor)
+  
+  for (i in 1:(ndim-1)) {
+    
+    for (j in (i+1):ndim) {
+      
+      if (df$Lineage[i] == df$Lineage[j]) {
+        within = append(within, mtx_rcor[i, j])
+       } else {
+        between = append(between, mtx_rcor[i, j])}
+    }
+    
+  }
+  
+  within_all = append(within_all, mean(within))
+  between_all = append(between_all, mean(between))
+  
+}
+
+# Summary of all shuffling runs.
+similarity_summary_all <- data.frame(similarity = c(within_all, between_all), 
+                                 relation = c(rep("within lineage", length(within_all)), 
+                                              rep("between lineages", length(between_all))))
+
+# Summary of the last one (with seed = 2023) as the representative shuffling result. 
+similarity_summary <- data.frame(similarity = c(within, between), 
+                                 relation = c(rep("within lineage", length(within)), 
+                                              rep("between lineages", length(between))))
+
+similarity_summary_all$relation %<>% factor(levels = c("between lineages", "within lineage"))
+similarity_summary$relation %<>% factor(levels = c("between lineages", "within lineage"))
+
+#write_csv(similarity_summary, "Fig S8C_PN_similarity_summary_binned_shuffled.csv")
+```
+
+
+```{r}
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary_all)
+
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = TRUE), median(similarity, na.rm = TRUE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between lineages", "within lineage"))
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between lineages" = "#9BC985",
+    "within lineage" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_v2_shuffle.pdf")
+```
