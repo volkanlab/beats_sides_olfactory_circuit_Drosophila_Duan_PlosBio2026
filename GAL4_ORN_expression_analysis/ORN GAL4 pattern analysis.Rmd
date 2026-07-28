@@ -1,0 +1,705 @@
+---
+title: "beat-side GAL4 in ORNs"
+output: html_notebook
+---
+
+This analysis was based on the GAL4 expression pattern data updated in April 2026. 
+
+## Load packages. 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(gplots)
+library(RColorBrewer)
+library(ggpubr)
+
+library(showtext)
+library(pheatmap)
+```
+
+## Load the dataset. 
+```{r}
+df <- read_csv("ORN beat-side expression matrix_2026.csv") %>% 
+  as.data.frame() 
+
+df$Sensillar_type <- factor(df$Sensillar_type, levels = c("TSB", "LB", "AT", "AC", "PB", "SA", "AR", "UNK"))
+```
+
+```{r}
+#For binary analysis in Fig 2, set all non-zero values to 1. For the analysis in Fig S5 based on the binned expression levels, keep the original matrix. 
+
+df_binary <- df
+
+df_binary[, -(1:5)] <- (df_binary[, -(1:5)] != 0) * 1
+```
+
+
+## Fig 2G. Lineage-biased expression of beat/side genes.
+```{r}
+df_binary %>%
+  group_by(Sensillar_type) %>%
+  count()
+
+expression_SensillarType <- df_binary %>%
+  group_by(Sensillar_type) %>%
+  summarise(across(where(is.numeric), mean)) 
+
+expression_SensillarType <- expression_SensillarType[order(expression_SensillarType$Sensillar_type), ]
+expression_SensillarType
+
+#write_csv(expression_SensillarType, "expression_SensillarType.csv")
+```
+
+
+```{r}
+expression_SensillarType_binarized <- expression_SensillarType %>% 
+  mutate(across(where(is.numeric), ~ ifelse(. >= 0.6, 1, ifelse(. <= 0.4, 0, 0.5)))) 
+
+mtx_template <- expression_SensillarType_binarized %>%
+  select(-Sensillar_type) %>%
+  as.matrix()
+
+rownames(mtx_template) <- expression_SensillarType_binarized$Sensillar_type
+
+pheatmap(mtx_template[(1:6), ],
+      color = colorRampPalette(c("white", "black"))(3),
+      cluster_rows = FALSE, 
+      cluster_cols = FALSE, 
+      show_rownames = TRUE, 
+      show_colnames = TRUE, 
+      fontsize = 14, 
+      angle_col = 90, 
+      #border_color = "gray", 
+      )
+```
+
+
+```{r}
+expression_SensillarType_binarized <- expression_SensillarType %>% 
+  mutate(across(where(is.numeric), ~ ifelse(. >= 0.6, "present", ifelse(. <= 0.4, "absent", "either"))))
+  #mutate(across(where(is.numeric), ~ ifelse(. > 0.5, "present", ifelse(. < 0.5, "absent", "either"))))
+
+#write_csv(expression_SensillarType_binarized, "expression_SensillarType_binarized.csv")
+
+expression_SensillarType_binarized_long <- expression_SensillarType_binarized %>%
+  pivot_longer(cols = -Sensillar_type, names_to = "gene", values_to = "expression")
+
+
+expression_SensillarType_binarized_long$gene <- 
+  factor(expression_SensillarType_binarized_long$gene, 
+         levels = c("beat-Ia", "beat-IIa", "beat-IIb", "side", "side-III", 
+                    "beat-IIIb", "beat-IIIc", "beat-IV", "beat-VII", "side-VI",
+                    "side-II", "side-V", "beat-Ib", 
+                    "beat-Ic", "beat-Vc", "beat-VI", "side-IV", 
+                    "beat-IIIa", "beat-Va", "side-VIII"))
+
+expression_SensillarType_binarized_long %>%
+  filter(Sensillar_type != "UNK" & Sensillar_type != "AR") %>%
+  ggplot(aes(x = gene, y = Sensillar_type)) +
+  scale_y_discrete(limits = rev) +
+  geom_dotplot(aes(fill = expression), binaxis = "y", stackdir = "center", dotsize = 2) +
+  #scale_fill_gradientn(colors = c("white", "gray", "black")) +
+  scale_fill_manual(values = c("present"="black", "absent"="white", "either"="gray")) +
+  geom_vline(xintercept = c(5.5, 12.5, 17.5), linewidth = 0.5) +
+  theme(
+    axis.title.x = element_blank(),     
+    axis.title.y = element_blank(),    
+    axis.text.x  = element_text(size = 14, angle = 45, vjust = 1, hjust = 1), 
+    axis.text.y  = element_text(size = 14), 
+    #legend.position = "none",
+    legend.title = element_text(size = 12), 
+    legend.text = element_text(size = 12), 
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+
+#ggsave("expression_template_split_revision1.pdf")
+```
+
+
+## Fig S12D. Expression breadth of beat/side genes based on the GAL4 labeling data across ORNs. 
+```{r}
+df_binary %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  t() %>%
+  as.data.frame()
+
+df_binary %>%
+  summarise(across(where(is.numeric), mean)) %>%
+  t() %>%
+  as.data.frame()
+
+
+df_binary[df_binary$Sensillar_type %in% c("TSB", "AT", "LB", "AC"), ] %>%
+  nrow()
+
+df_binary[df_binary$Sensillar_type %in% c("TSB", "AT", "LB", "AC"), ] %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  t() %>%
+  as.data.frame()
+
+df_binary[df_binary$Sensillar_type %in% c("TSB", "AT", "LB", "AC"), ] %>%
+  summarise(across(where(is.numeric), mean)) %>%
+  t() %>%
+  as.data.frame()
+```
+
+
+## Fig 2B, 2C, 2D, S5. Hierarchical clustering analysis of beat/side expression across ORNs based on the binary/binned GAL4 labeling data. 
+
+### Fig 2B.
+```{r}
+mtx <- df_binary[-c(1,2,3,4,5)] %>% as.matrix()
+
+rownames(mtx) <- df_binary[["Glomerulus"]]
+```
+
+
+```{r, fig.width = 30, fig.height = 36}
+row_colors <- brewer.pal(length(unique(df$Sensillar_type)), "Set2")[as.numeric(df$Sensillar_type)]
+
+#pdf("heatmap_revision_jaccard.pdf", width = 30,height = 36)
+
+heatmap.2(mtx, 
+          col = colorRampPalette(c("white", "dodgerblue"))(2),
+          dendrogram = "both",
+          trace = "none",
+          RowSideColors = row_colors,
+          colsep = 0:ncol(mtx),
+          rowsep = 0:nrow(mtx),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 4,  # Font size for column labels
+          key = FALSE,
+          #density.info = "none", 
+          #keysize = 0.6,         # smaller than default (default ~1.5)
+          #key.par = list(mar = c(3, 3, 1, 1))  # shrink margins around key
+          )
+
+legend("topleft", 
+       legend = sort(unique(df$Sensillar_type)), 
+       fill =  brewer.pal(length(unique(df$Sensillar_type)), "Set2"),
+       title = "Sensillar types", 
+       cex = 4.5)
+
+#dev.off()  
+```
+
+
+### Fig 2C. 
+```{r}
+# Exclude two glomeruli that are innervated by more than one type of ORNs. 
+df <- df_binary[df_binary$Glomerulus != "VP4" & df_binary$Glomerulus != "VL1", ] 
+
+mtx <- df[-c(1,2,3,4,5)] %>% as.matrix()
+rownames(mtx) <- df[["Glomerulus"]]
+
+mtx_rcor <- cor(t(mtx))
+```
+
+
+```{r}
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(mtx_rcor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, mtx_rcor[i, j])
+    
+    if (df$Sensillum[i] == df$Sensillum[j]) {
+        relation = append(relation, "within sensillum")
+    } else if (df$Sensillar_type[i] == df$Sensillar_type[j]) {
+      relation = append(relation, "within sensillar type")
+    } else {
+        relation = append(relation, "between sensillar types")
+        }
+  }
+}
+```
+
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+
+#write_csv(similarity_summary, "Fig 2C_ORN_similarity_summary.csv")
+```
+
+
+```{r}
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("within sensillar type", "within sensillum"))
+```
+
+
+```{r}
+showtext_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        )
+
+#ggsave("similarity_comparison_spectrum.pdf")
+```
+
+
+### Fig 2D. 
+```{r}
+within_sensillum_all <- numeric()
+within_type_all <- numeric()
+between_type_all <- numeric()
+
+# Run multiple times of shuffling. 
+for (x in 1789:2024) {
+  
+  set.seed(x)
+  df_shuffled <- df[sample(1:nrow(df)), ]
+  
+  mtx <- df_shuffled[-c(1,2,3,4,5)] %>% as.matrix()
+  mtx_rcor <- cor(t(mtx))
+  
+  within_sensillum <- numeric()
+  within_type <- numeric()
+  between_type <- numeric()
+  
+  ndim = nrow(mtx_rcor)
+  
+  for (i in 1:(ndim-1)) {
+    
+    for (j in (i+1):ndim) {
+      
+      if (df$Sensillum[i] == df$Sensillum[j]) {
+        within_sensillum = append(within_sensillum, mtx_rcor[i, j]) 
+        } else if (df$Sensillar_type[i] == df$Sensillar_type[j]) { 
+        within_type = append(within_type, mtx_rcor[i, j]) 
+        } else {
+        between_type <- append(between_type, mtx_rcor[i, j])
+        }
+    }
+  }
+ 
+  within_sensillum_all = append(within_sensillum_all, mean(within_sensillum))
+  within_type_all = append(within_type_all, mean(within_type))
+  between_type_all <- append(between_type_all, mean(between_type))
+  }
+
+# Summary of all shuffling runs.
+similarity_summary_all <- data.frame(similarity = c(within_sensillum_all, within_type_all, between_type_all), 
+                                 relation = c(rep("within sensillum", length(within_sensillum_all)), 
+                                              rep("within sensillar type", length(within_type_all)), 
+                                              rep("between sensillar types", length(between_type_all))
+                                              )
+                                 )
+
+# Summary of the last one (with seed = 2024) as the representative shuffling result. 
+similarity_summary <- data.frame(similarity = c(within_sensillum, within_type, between_type), 
+                                 relation = c(rep("within sensillum", length(within_sensillum)), 
+                                              rep("within sensillar type", length(within_type)), 
+                                              rep("between sensillar types", length(between_type))
+                                              )
+                                 )
+
+similarity_summary_all$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+
+#write_csv(similarity_summary, "Fig 2D_ORN_similarity_summary_shuffled.csv")
+```
+
+
+```{r}
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary_all)
+
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("within sensillar type", "within sensillum"))
+
+
+showtext_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_shuffle.pdf")
+```
+
+
+
+
+### Fig S5A. 
+```{r}
+# Reload the original binned dataset.
+df <- read_csv("ORN beat-side expression matrix_2026.csv") %>% 
+  as.data.frame() 
+
+df$Sensillar_type <- factor(df$Sensillar_type, levels = c("TSB", "LB", "AT", "AC", "PB", "SA", "AR", "UNK"))
+
+mtx <- df[-c(1,2,3,4,5)] %>% as.matrix()
+
+rownames(mtx) <- df[["Glomerulus"]]
+```
+
+
+```{r, fig.width = 30, fig.height = 36}
+row_colors <- brewer.pal(length(unique(df$Sensillar_type)), "Set2")[as.numeric(df$Sensillar_type)]
+
+
+#pdf("heatmap_revision_jaccard.pdf", width = 30,height = 36)
+
+pal <- brewer.pal(4, "Blues")
+pal[1] <- "white"
+
+heatmap.2(mtx, 
+          col = pal,
+          dendrogram = "both",
+          trace = "none",
+          RowSideColors = row_colors,
+          colsep = 0:ncol(mtx),
+          rowsep = 0:nrow(mtx),
+          sepcolor = "gray", 
+          sepwidth = c(0.01, 0.01),
+          cexRow = 3,  # Font size for row labels
+          cexCol = 4,  # Font size for column labels
+          key = FALSE,
+          #density.info = "none", 
+          #keysize = 0.6,          # smaller than default (default ~1.5)
+          #key.par = list(mar = c(3, 3, 1, 1))  # shrink margins around key
+          )
+
+legend("topleft", 
+       legend = sort(unique(df$Sensillar_type)), 
+       fill =  brewer.pal(length(unique(df$Sensillar_type)), "Set2"),
+       title = "Sensillar types", 
+       cex = 4.5)
+
+#dev.off()  
+```
+
+
+### Fig S5B
+```{r}
+# Exclude two glomeruli that are innervated by more than one type of ORNs. 
+df <- df[df$Glomerulus != "VP4" & df$Glomerulus != "VL1",]
+
+mtx <- df[-c(1,2,3,4,5)] %>% as.matrix()
+rownames(mtx) <- df[["Glomerulus"]]
+
+mtx_rcor <- cor(t(mtx))
+```
+
+
+```{r}
+similarity <- numeric()
+relation <- character()
+
+ndim = nrow(mtx_rcor)
+
+for (i in 1:(ndim-1)) {
+  for (j in (i+1):ndim) {
+    similarity = append(similarity, mtx_rcor[i, j])
+    
+    if (df$Sensillum[i] == df$Sensillum[j]) {
+        relation = append(relation, "within sensillum")
+    } else if (df$Sensillar_type[i] == df$Sensillar_type[j]) {
+      relation = append(relation, "within sensillar type")
+    } else {
+        relation = append(relation, "between sensillar types")
+        }
+  }
+}
+```
+
+
+```{r}
+similarity_summary <- data.frame(similarity = similarity, relation = relation)
+
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+
+#write_csv(similarity_summary, "Fig S5B_ORN_similarity_summary_binned.csv")
+```
+
+
+```{r}
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("within sensillar type", "within sensillum"))
+```
+
+
+```{r}
+showtext_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        )
+
+#ggsave("similarity_comparison_spectrum.pdf")
+```
+
+
+### Fig S5C
+```{r}
+within_sensillum_all <- numeric()
+within_type_all <- numeric()
+between_type_all <- numeric()
+
+# Run multiple times of shuffling. 
+for (x in 1789:2024) {
+  
+  set.seed(x)
+  df_shuffled <- df[sample(1:nrow(df)), ]
+  
+  mtx <- df_shuffled[-c(1,2,3,4,5)] %>% as.matrix()
+  mtx_rcor <- cor(t(mtx))
+  
+  within_sensillum <- numeric()
+  within_type <- numeric()
+  between_type <- numeric()
+  
+  ndim = nrow(mtx_rcor)
+  
+  for (i in 1:(ndim-1)) {
+    
+    for (j in (i+1):ndim) {
+      
+      if (df$Sensillum[i] == df$Sensillum[j]) {
+        within_sensillum = append(within_sensillum, mtx_rcor[i, j]) 
+        } else if (df$Sensillar_type[i] == df$Sensillar_type[j]) { 
+        within_type = append(within_type, mtx_rcor[i, j]) 
+        } else {
+        between_type <- append(between_type, mtx_rcor[i, j])
+        }
+    }
+  }
+ 
+  within_sensillum_all = append(within_sensillum_all, mean(within_sensillum))
+  within_type_all = append(within_type_all, mean(within_type))
+  between_type_all <- append(between_type_all, mean(between_type))
+  }
+
+# Summary of all shuffling runs.
+similarity_summary_all <- data.frame(similarity = c(within_sensillum_all, within_type_all, between_type_all), 
+                                 relation = c(rep("within sensillum", length(within_sensillum_all)), 
+                                              rep("within sensillar type", length(within_type_all)), 
+                                              rep("between sensillar types", length(between_type_all))
+                                              )
+                                 )
+
+# Summary of the last one (with seed = 2024) as the representative shuffling result. 
+similarity_summary <- data.frame(similarity = c(within_sensillum, within_type, between_type), 
+                                 relation = c(rep("within sensillum", length(within_sensillum)), 
+                                              rep("within sensillar type", length(within_type)), 
+                                              rep("between sensillar types", length(between_type))
+                                              )
+                                 )
+
+similarity_summary_all$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+similarity_summary$relation %<>% factor(levels = c("between sensillar types", "within sensillar type", "within sensillum"))
+
+#write_csv(similarity_summary, "Fig S5C_ORN_similarity_summary_binned_shuffled.csv")
+```
+
+
+```{r}
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary_all %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary_all)
+
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::count()
+
+similarity_summary %>% 
+  dplyr::group_by(relation) %>%
+  dplyr::summarise(mean(similarity, na.rm = FALSE), median(similarity, na.rm = FALSE))
+
+compare_means(similarity ~ relation, data = similarity_summary)
+```
+
+
+```{r}
+my_comparison <- list(c("between sensillar types", "within sensillar type"), 
+                      c("between sensillar types", "within sensillum"), 
+                      c("within sensillar type", "within sensillum"))
+
+showtext_auto()
+
+data <- similarity_summary
+
+ggplot(data, aes(x = relation, y = similarity, fill = relation)) +
+  geom_boxplot() +
+  #geom_violin() +
+  #geom_jitter() +
+  geom_signif(
+    comparisons = my_comparison,
+    na.rm = TRUE,
+    #test = "t.test",
+    step_increase = 0.1, 
+    textsize = 4,
+    map_signif_level = function(p) sprintf("%.2g", p),
+    #y_position = 0.5
+    ) +
+  scale_fill_manual(values = c(
+    "between sensillar types" = "#9BC985",
+    "within sensillar type" = "#F7D58B",
+    "within sensillum" = "#B595BF"
+  )) + 
+  #ylim(NA, 1) +
+  #coord_fixed(ratio=1) +
+  theme_classic() +
+  theme(aspect.ratio = 1) +
+  theme(#axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.text.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_text(size = 18),
+        legend.title=element_text(size = 18),
+        legend.text=element_text(size = 15)
+        ) 
+
+#ggsave("similarity_comparison_spectrum_shuffle.pdf")
+```
+
