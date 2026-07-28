@@ -1,0 +1,109 @@
+---
+title: "Visualizing beat/side expression in bulk PNs"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+#library(gplots)
+#library(RColorBrewer)
+```
+
+```{r}
+df <- read_csv("GSE140093_df_PN_VT_Bulk_36h_adult_LogCPM.csv") %>% as.data.frame()
+genes <- read_csv("genelist_beat-side.txt") %>% as.data.frame() %$% gene 
+```
+
+```{r}
+df_bs <- df[df$symbol %in% genes, ]
+
+df_bs
+```
+
+
+```{r}
+df_bs[df_bs$symbol %in% c("CG12950",
+                          "CG14372",
+                          "CG34113", 
+                          "CG34114",
+                          "CG34371",
+                          "CG12484",
+                          "CG42313"), ]$symbol <- c("side-VII", 
+                                                    "side-IV", 
+                                                    "side-III",
+                                                    "side-VI", 
+                                                    "side-V",
+                                                    "side-VIII",
+                                                    "side-II")
+
+df_bs
+```
+
+
+```{r}
+df_bs_mtx <- dplyr::select(df_bs, -symbol) %>% 
+  as.matrix() %>% 
+  t()
+
+colnames(df_bs_mtx) <- df_bs$symbol
+rownames(df_bs_mtx) <- c("36h_1", "36h_2", "36h_3", "adult_1", "adult_2", "adult_3")
+```
+
+
+```{r}
+tree_gene <- hclust(as.dist(1-cor(df_bs_mtx)), method="complete")
+```
+
+
+```{r}
+plot(tree_gene)
+```
+
+
+```{r, fig.width=8, fig.height=8}
+color.scheme <- brewer.pal(8,"GnBu") # generate the color scheme to use
+
+heatmap.2(t(df_bs_mtx),
+          #Rowv = tree_gene,  # use the dendrogram previously calculated
+          Colv = NULL, # don't mess with my columns! (i.e. keep current ordering )
+          dendrogram = "row",   # only draw row dendrograms
+          #breaks = seq(-2, 2, length.out = 9),  # OPTIONAL: set break points for colors
+          col = color.scheme,  # use previously defined colors
+          trace = "none", density.info = "none",  # remove distracting elements of plot
+          )
+```
+
+
+
+
+```{r}
+df_bs_long <- df_bs %>% 
+  pivot_longer(cols = !symbol,
+               names_to = "stage_rep",
+               values_to = "expression") %>%
+  tidyr::extract(col = stage_rep,     # column we're extracting from
+                 into = c("cell_type", "stage", "rep"), # new columns we're creating
+                 regex= "(PN)_(.+)_(rep[0-9]+)",  # regexp (see below)
+                 convert = TRUE) # automatically convert column types
+```
+
+
+```{r}
+df_bs_long$symbol %<>% factor(levels = sort(df_bs$symbol))
+df_bs_long$stage %<>% factor(levels = c("36h", "adult"))
+```
+
+
+```{r, fig.width=8, fig.height=4}
+df_bs_long %>%
+  ggplot(aes(x=stage, y=expression)) +
+  geom_point(aes(shape=rep, color=stage)) +
+  facet_wrap(~symbol, ncol = 7) +
+  ylim(0, 10) +
+  theme_linedraw() +
+  theme(aspect.ratio = 1) +
+  theme(strip.text = element_text(face="italic", color="black"),
+        strip.background =element_rect(fill=NA))
+```
+
